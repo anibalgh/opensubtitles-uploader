@@ -1,6 +1,256 @@
-node_modules
-test*
-build
-cache
-Thumbs*
-package-lock.json
+# ============================================
+# Dependencies
+# ============================================
+node_modules/
+bun.lock
+
+# ============================================
+# Build output
+# ============================================
+dist/
+build/
+out/
+.next/
+.nuxt/
+.svelte-kit/
+
+# ============================================
+# Rust
+# ============================================
+src-tauri/target/
+**/*.rs.bk
+*.pdb
+
+# ============================================
+# Node.js / Bun
+# ============================================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnpm-store/
+*.tgz
+
+# ============================================
+# IDE — VSCode / VSCodium
+# ============================================
+.vscode/
+.vscode-test/
+.history/
+*.code-workspace
+
+# ============================================
+# IDE — JetBrains (IntelliJ, WebStorm, RustRover, etc.)
+# ============================================
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# ============================================
+# IDE — Eclipse
+# ============================================
+.classpath
+.project
+.settings/
+.metadata/
+*.eml
+
+# ============================================
+# IDE — NetBeans
+# ============================================
+nbproject/
+nbbuild/
+nbdist/
+.nb-gradle/
+build/
+
+# ============================================
+# IDE — Zed
+# ============================================
+.zed/
+
+# ============================================
+# IDE — Windsurf
+# ============================================
+.windsurf/
+
+# ============================================
+# IDE — Cursor
+# ============================================
+.cursor/
+.cursorrules
+
+# ============================================
+# IDE — Sublime Text
+# ============================================
+*.sublime-project
+*.sublime-workspace
+
+# ============================================
+# IDE — Kate
+# ============================================
+*.kate-swp
+
+# ============================================
+# IDE — Vim
+# ============================================
+[._]*.s[a-v][a-z]
+!*.svg
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+Session.vim
+Sessionx.vim
+.netrwhist
+*~
+tags
+[._]*.un~
+
+# ============================================
+# IDE — Emacs
+# ============================================
+*~
+\#*\#
+.\#*
+*#
+
+# ============================================
+# IDE — Geany
+# ============================================
+*.geany
+
+# ============================================
+# IDE — TextMate
+# ============================================
+*.tmproj
+*.tmproject
+
+# ============================================
+# macOS
+# ============================================
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# ============================================
+# Windows
+# ============================================
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# ============================================
+# Linux
+# ============================================
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+*.swp
+*.swo
+.directory
+
+# ============================================
+# Android
+# ============================================
+*.apk
+*.aab
+*.dex
+*.class
+bin/
+gen/
+.gradle/
+local.properties
+*.iml
+.idea/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.jks
+*.keystore
+google-services.json
+
+# ============================================
+# iOS
+# ============================================
+*.ipa
+*.dSYM.zip
+*.dSYM
+Pods/
+.build/
+*.xcworkspace
+xcuserdata/
+DerivedData/
+*.hmap
+*.ipa
+*.xcuserstate
+**/.xcode.env.local
+
+# ============================================
+# Environment & Secrets
+# ============================================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets.*
+credentials.*
+*.private.*
+
+# ============================================
+# TypeScript
+# ============================================
+*.tsbuildinfo
+
+# ============================================
+# Misc
+# ============================================
+*.orig
+*.tmp
+*.temp
+*.bak
+*.cache
+*.pid
+*.seed
+*.pid.lock
+coverage/
+.nyc_output/
+.eslintcache
+.stylelintcache
+.turbo
+.vercel
+.terraform/
+*.tfstate*
+*.tfvars
