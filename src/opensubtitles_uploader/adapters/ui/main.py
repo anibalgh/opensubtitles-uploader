@@ -6,6 +6,7 @@ import sys
 
 from opensubtitles_uploader import __version__
 from opensubtitles_uploader.adapters.ui.i18n import Translator
+from opensubtitles_uploader.adapters.ui.icons import app_icon
 from opensubtitles_uploader.adapters.ui.main_window import MainWindow
 from opensubtitles_uploader.adapters.ui.theme import apply_theme
 from opensubtitles_uploader.bootstrap import bootstrap
@@ -18,6 +19,7 @@ def main() -> int:
     app.setApplicationName("OpenSubtitles Uploader")
     app.setApplicationVersion(__version__)
     app.setOrganizationName("anibalgh")
+    app.setWindowIcon(app_icon())
 
     ctx = bootstrap()
     locale = str(ctx.settings.get("locale", "en") or "en")

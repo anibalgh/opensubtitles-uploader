@@ -46,7 +46,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 packages = [{ include = "opensubtitles_uploader", from = "src" }]
-include = ["src/opensubtitles_uploader/data/*.json"]
+include = ["src/opensubtitles_uploader/data/**/*"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.2.0,<9.0.0"

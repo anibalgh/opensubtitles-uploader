@@ -67,3 +67,52 @@ def test_parse_rejects_doctype():
         pass
     else:  # pragma: no cover
         raise AssertionError("expected XmlRpcError for unsafe payload")
+
+
+def test_login_status_401_rejected_even_with_token(monkeypatch):
+    from opensubtitles_uploader.adapters.osapi.xmlrpc import XmlRpcClient
+    from opensubtitles_uploader.domain.errors import AuthError
+
+    client = XmlRpcClient()
+
+    def fake_call(method, params):
+        assert method == "LogIn"
+        return {"token": "should-not-be-used", "status": "401 Unauthorized"}
+
+    monkeypatch.setattr(client, "call", fake_call)
+    try:
+        client.login("user", "wrong-password")
+    except AuthError as exc:
+        assert "Wrong username or password" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("expected AuthError for status 401")
+
+
+def test_login_status_200_returns_token(monkeypatch):
+    from opensubtitles_uploader.adapters.osapi.xmlrpc import XmlRpcClient
+
+    client = XmlRpcClient()
+
+    def fake_call(method, params):
+        return {"token": "tok123", "status": "200 OK"}
+
+    monkeypatch.setattr(client, "call", fake_call)
+    assert client.login("user", "secret") == "tok123"
+
+
+def test_login_missing_token_raises(monkeypatch):
+    from opensubtitles_uploader.adapters.osapi.xmlrpc import XmlRpcClient
+    from opensubtitles_uploader.domain.errors import AuthError
+
+    client = XmlRpcClient()
+
+    def fake_call(method, params):
+        return {"status": "200 OK"}
+
+    monkeypatch.setattr(client, "call", fake_call)
+    try:
+        client.login("user", "secret")
+    except AuthError:
+        pass
+    else:  # pragma: no cover
+        raise AssertionError("expected AuthError without a token")

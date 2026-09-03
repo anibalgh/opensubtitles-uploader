@@ -210,8 +210,24 @@ class XmlRpcClient:
         try:
             result = self.call("LogIn", [username, password, language, self._user_agent])
         except XmlRpcError as exc:
-            raise AuthError(exc.message) from exc
-        token = (result or {}).get("token")
+            message = str(exc)
+            lowered = message.lower()
+            if any(
+                word in lowered
+                for word in ("401", "unauthorized", "incorrect", "wrong", "password")
+            ):
+                message = "Wrong username or password"
+            raise AuthError(message) from exc
+        result = result or {}
+        # The server reports success/failure through ``status``; a token may
+        # be present even on failure, so it is *not* the success signal.
+        status = str(result.get("status") or "")
+        if not status.startswith("200"):
+            message = status if status else "OpenSubtitles rejected the login."
+            if any(word in message.lower() for word in ("401", "unauthorized")):
+                message = "Wrong username or password"
+            raise AuthError(message, code="auth_error")
+        token = result.get("token")
         if not token:
             raise AuthError("OpenSubtitles rejected the login.", code="auth_error")
         return str(token)

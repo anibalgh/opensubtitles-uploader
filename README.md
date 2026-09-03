@@ -137,10 +137,15 @@ poetry run pytest                    # tests unitarios + integración
 poetry run ruff check src tests      # linter
 poetry run mypy src                  # chequeo estático estricto
 poetry run bandit -r src             # análisis de seguridad estático
+python scripts/verify_login.py       # verifica el login/APIs en vivo (usa .env)
 ```
 
 Los tests de red reales (marcados `e2e`) están desactivados por defecto:
-`poetry run pytest -m e2e` requiere credenciales/API key reales.
+`poetry run pytest -m e2e` requiere credenciales/API key reales.  Para
+probar el login contra el servicio real sin tocar los tests, cree un
+archivo `.env` (ignorado por git) con `OPENSUBTITLES_USERNAME`,
+`OPENSUBTITLES_PASSWORD` y `OPENSUBTITLES_API_KEY`, y ejecute
+`python scripts/verify_login.py`.
 
 ## ⚠️ Avisos
 

@@ -273,3 +273,4 @@ __pycache__/
 .poetry-cache/
 .poetry-config/
 .poetry-data/
+.env

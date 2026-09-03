@@ -45,6 +45,7 @@ from opensubtitles_uploader.adapters.ui.dialogs import (
     upload_result_dialog,
 )
 from opensubtitles_uploader.adapters.ui.i18n import Translator
+from opensubtitles_uploader.adapters.ui.icons import app_icon, app_pixmap
 from opensubtitles_uploader.adapters.ui.workers import TaskWorker
 from opensubtitles_uploader.bootstrap import AppContext
 from opensubtitles_uploader.domain.errors import DomainError
@@ -109,6 +110,7 @@ class MainWindow(QMainWindow):
         self._subtitle: SubtitleFile | None = None
 
         self.setWindowTitle("OpenSubtitles Uploader")
+        self.setWindowIcon(app_icon())
         self.resize(1080, 760)
         self.setMinimumSize(940, 640)
 
@@ -151,6 +153,11 @@ class MainWindow(QMainWindow):
     def _build_topbar(self) -> QHBoxLayout:
         bar = QHBoxLayout()
 
+        brand_icon = QLabel()
+        brand_icon.setPixmap(app_pixmap(36))
+        brand_icon.setFixedSize(36, 36)
+        bar.addWidget(brand_icon)
+
         title_box = QVBoxLayout()
         title = QLabel("OpenSubtitles Uploader")
         title.setObjectName("panelTitle")
@@ -160,6 +167,7 @@ class MainWindow(QMainWindow):
         title_box.addWidget(version)
         bar.addLayout(title_box)
 
+        bar.addSpacing(12)
         bar.addStretch(1)
 
         # login state
