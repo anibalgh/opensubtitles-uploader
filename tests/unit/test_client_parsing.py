@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import gzip
 import zlib
 from pathlib import Path
 
@@ -65,16 +64,15 @@ def test_parse_feature_episode_uses_parent_title():
     assert movie.season == 1 and movie.episode == 1
 
 
-def test_osu_gzip_no_header_matches_raw_deflate():
-    payload = b"1\n00:00:01,000 --> 00:00:02,000\nHello!\n" * 50
-    encoded = OpenSubtitlesClient._osu_gzip(payload)
+def test_osu_gzip_is_zlib_rfc1950():
     import base64
 
+    payload = b"1\n00:00:01,000 --> 00:00:02,000\nHola mundo\n" * 50
+    encoded = OpenSubtitlesClient._osu_gzip(payload)
     raw = base64.b64decode(encoded)
-    # gzip.compress without its 10-byte header == zlib raw deflate stream
-    assert zlib.decompress(raw, -zlib.MAX_WBITS) == payload
-    # ...and equals gzip.compress()[10:]
-    assert raw == gzip.compress(payload, compresslevel=9, mtime=0)[10:]
+    # Matches Node.js zlib.deflate() used by the original opensubtitles-api
+    assert zlib.decompress(raw) == payload
+    assert raw == zlib.compress(payload)
 
 
 def test_content_md5(tmp_path):

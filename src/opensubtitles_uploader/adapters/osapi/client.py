@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import base64
 import contextlib
-import gzip
 import hashlib
 import threading
 from pathlib import Path
@@ -476,9 +475,17 @@ class OpenSubtitlesClient:
     # ------------------------------------------------------------------
     @staticmethod
     def _osu_gzip(content: bytes) -> str:
-        """gzip without the 10-byte header, base64 — the format the legacy
-        OpenSubtitles API expects for ``subcontent``."""
-        compressed = gzip.compress(content, compresslevel=9, mtime=0)[10:]
+        """Base64 of the zlib (RFC 1950) compressed subtitle.
+
+        This mirrors the encoding used by the original
+        ``opensubtitles-api`` (``zlib.deflate`` in Node.js) which the legacy
+        XML-RPC endpoint expects for ``subcontent``.  *Not* gzip: a gzip
+        payload makes the server report "SubHashes ... not same" and
+        "invalid format".
+        """
+        import zlib
+
+        compressed = zlib.compress(content)
         return base64.b64encode(compressed).decode("ascii")
 
     @staticmethod
