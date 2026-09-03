@@ -223,6 +223,23 @@ poetry run python scripts/build_app.py cli      # (opcional) → dist/opensubtit
   binario generado con la herramienta que prefiera; el icono oficial ya está
   incluido.
 
+### Releases automáticas (GitHub Actions)
+
+El repositorio incluye `.github/workflows/release.yml`: al publicar un tag
+`v*`, se compila el binario **en paralelo para Windows, macOS y Linux**
+(matriz de runners con PyInstaller) y se publica una **GitHub Release** con
+los tres artefactos (`OpenSubtitlesUploader-windows.zip`,
+`OpenSubtitlesUploader-macos.zip`, `OpenSubtitlesUploader-linux.tar.gz`).
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0     # dispara el workflow y crea la Release
+```
+
+También puede ejecutarse manualmente desde *Actions → Release binaries →
+Run workflow*.  Nota: los binarios no están firmados (macOS pedirá *Abrir*
+la primera vez; Windows mostrará el aviso de SmartScreen).
+
 ## 🧪 Desarrollo y calidad
 
 ```bash

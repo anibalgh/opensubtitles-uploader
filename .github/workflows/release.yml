@@ -1,0 +1,127 @@
+name: Release binaries (Windows · macOS · Linux)
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  # ------------------------------------------------------------------
+  # 1) Build the GUI binary on every operating system
+  # ------------------------------------------------------------------
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows
+            archive: zip
+          - os: macos-latest
+            name: macos
+            archive: zip
+          - os: ubuntu-latest
+            name: linux
+            archive: tar
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: python -m pip install --upgrade "poetry>=2.0,<3"
+
+      - name: Install dependencies (PyInstaller extra)
+        run: poetry install -E build
+
+      - name: Build GUI binary with PyInstaller
+        run: poetry run python scripts/build_app.py gui
+
+      - name: Prepare artifact (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist-artifact | Out-Null
+          Compress-Archive -Path "dist\OpenSubtitlesUploader" -DestinationPath "dist-artifact\OpenSubtitlesUploader-windows.zip"
+
+      - name: Prepare artifact (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          mkdir -p dist-artifact
+          cd dist
+          zip -qry ../dist-artifact/OpenSubtitlesUploader-macos.zip OpenSubtitlesUploader.app
+
+      - name: Prepare artifact (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir -p dist-artifact
+          tar -C dist -czf dist-artifact/OpenSubtitlesUploader-linux.tar.gz OpenSubtitlesUploader
+          chmod -R a+rX dist-artifact
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: opensubtitles-uploader-${{ matrix.name }}
+          path: dist-artifact/*
+          if-no-files-found: error
+
+  # ------------------------------------------------------------------
+  # 2) Publish a GitHub Release with the three binaries
+  # ------------------------------------------------------------------
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-artifacts
+          merge-multiple: true
+
+      - name: Inspect artifacts
+        run: ls -lhR dist-artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-artifacts/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          body: |
+            ## OpenSubtitles Uploader — binarios por plataforma
+
+            - **Windows** → `OpenSubtitlesUploader-windows.zip` (extraer y ejecutar `OpenSubtitlesUploader.exe`)
+            - **macOS** → `OpenSubtitlesUploader-macos.zip` (extraer y abrir `OpenSubtitlesUploader.app`)
+            - **Linux** → `OpenSubtitlesUploader-linux.tar.gz` (extraer y ejecutar `OpenSubtitlesUploader/OpenSubtitlesUploader`)
+
+            ### Antes de usar el binario
+            Coloca junto al ejecutable un archivo `.env` (o define las variables de entorno):
+
+            ```
+            OPENSUBTITLES_API_KEY=tu_api_key
+            OPENSUBTITLES_USERNAME=usuario_metadatos_com
+            OPENSUBTITLES_PASSWORD=pass_metadatos_com
+            ```
+
+            El **login de subida** (cuenta opensubtitles.org) se escribe dentro de la app.
+
+            > Los binarios **no están firmados**: en macOS usa clic derecho → *Abrir* la
+            > primera vez; en Windows puede aparecer el aviso de SmartScreen
+            > (Más información → Ejecutar de todas formas).
