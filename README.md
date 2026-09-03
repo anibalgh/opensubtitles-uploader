@@ -133,7 +133,7 @@ src/opensubtitles_uploader/
 ├── bootstrap.py     # raíz de composición: cablea adaptadores → núcleo
 └── config.py        # rutas de usuario (platformdirs), .env y variables de entorno
 tests/               # unit/ + e2e/ (los e2e requieren red, desactivados)
-scripts/             # verify_login.py, build_app.py
+scripts/             # verify_login.py, build_app.py, launch_gui.py, launch_cli.py
 ```
 
 ### Cómo se conecta con OpenSubtitles
@@ -167,8 +167,8 @@ Prerrequisitos comunes:
 git clone git@github.com:anibalgh/opensubtitles-uploader.git
 cd opensubtitles-uploader
 poetry install -E build
-poetry run python scripts/build_app.py gui      # → dist\OpenSubtitlesUploader.exe
-poetry run python scripts/build_app.py cli      # (opcional) → dist\opensubtitles-uploader-cli.exe
+poetry run python scripts/build_app.py gui      # → dist\OpenSubtitlesUploader\ (GUI)
+poetry run python scripts/build_app.py cli      # (opcional) → dist\opensubtitles-uploader-cli\ (CLI)
 ```
 
 - Icono `.ico` incrustado en el ejecutable.
@@ -181,8 +181,8 @@ poetry run python scripts/build_app.py cli      # (opcional) → dist\opensubtit
 git clone git@github.com:anibalgh/opensubtitles-uploader.git
 cd opensubtitles-uploader
 poetry install -E build
-poetry run python scripts/build_app.py gui      # → dist/OpenSubtitlesUploader.app
-poetry run python scripts/build_app.py cli      # (opcional) → dist/opensubtitles-uploader-cli
+poetry run python scripts/build_app.py gui      # → dist/OpenSubtitlesUploader.app (GUI)
+poetry run python scripts/build_app.py cli      # (opcional) → dist/opensubtitles-uploader-cli (CLI)
 ```
 
 - Icono `.icns` incrustado en la app bundle.
@@ -197,8 +197,8 @@ poetry run python scripts/build_app.py cli      # (opcional) → dist/opensubtit
 git clone git@github.com:anibalgh/opensubtitles-uploader.git
 cd opensubtitles-uploader
 poetry install -E build
-poetry run python scripts/build_app.py gui      # → dist/OpenSubtitlesUploader
-poetry run python scripts/build_app.py cli      # (opcional) → dist/opensubtitles-uploader-cli
+poetry run python scripts/build_app.py gui      # → dist/OpenSubtitlesUploader/ (GUI)
+poetry run python scripts/build_app.py cli      # (opcional) → dist/opensubtitles-uploader-cli/ (CLI)
 ```
 
 - Icono `.png` referenciado; los recursos (iconos + lista de idiomas) quedan
@@ -215,10 +215,14 @@ poetry run python scripts/build_app.py cli      # (opcional) → dist/opensubtit
   en el directorio actual, en la raíz del repo (desarrollo) y en la carpeta
   de configuración del usuario.  Si falta, la app lo indica y se cierra
   (también puede exportar las variables como entorno real).
-- Entradas: GUI → `opensubtitles_uploader.adapters.ui.main:main`
-  (sin consola), CLI → `opensubtitles_uploader.adapters.cli.main:main`.
-- Resultado en `dist/`; artefactos intermedios en `build/` (ignorados por
-  git).
+- Entradas PyInstaller: `scripts/launch_gui.py` (GUI, sin consola) y
+  `scripts/launch_cli.py` (CLI, con consola); ambos llaman al `main()` del
+  paquete.
+- Resultado en `dist/` (formato *onedir*):
+  - GUI: `dist/OpenSubtitlesUploader/` (el ejecutable está dentro,
+    `OpenSubtitlesUploader.exe` en Windows, `…app` en macOS);
+  - CLI: `dist/opensubtitles-uploader-cli/`.
+  Los artefactos intermedios quedan en `build/` (ignorados por git).
 - Para instaladores finales (NSIS/MSI, DMG, .deb/AppImage) puede envolver el
   binario generado con la herramienta que prefiera; el icono oficial ya está
   incluido.
