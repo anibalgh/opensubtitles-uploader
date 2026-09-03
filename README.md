@@ -167,8 +167,8 @@ Prerrequisitos comunes:
 git clone git@github.com:anibalgh/opensubtitles-uploader.git
 cd opensubtitles-uploader
 poetry install -E build
-python scripts/build_app.py gui      # → dist\OpenSubtitlesUploader.exe
-python scripts/build_app.py cli      # (opcional) → dist\opensubtitles-uploader-cli.exe
+poetry run python scripts/build_app.py gui      # → dist\OpenSubtitlesUploader.exe
+poetry run python scripts/build_app.py cli      # (opcional) → dist\opensubtitles-uploader-cli.exe
 ```
 
 - Icono `.ico` incrustado en el ejecutable.
@@ -181,8 +181,8 @@ python scripts/build_app.py cli      # (opcional) → dist\opensubtitles-uploade
 git clone git@github.com:anibalgh/opensubtitles-uploader.git
 cd opensubtitles-uploader
 poetry install -E build
-python scripts/build_app.py gui      # → dist/OpenSubtitlesUploader.app
-python scripts/build_app.py cli      # (opcional) → dist/opensubtitles-uploader-cli
+poetry run python scripts/build_app.py gui      # → dist/OpenSubtitlesUploader.app
+poetry run python scripts/build_app.py cli      # (opcional) → dist/opensubtitles-uploader-cli
 ```
 
 - Icono `.icns` incrustado en la app bundle.
@@ -197,8 +197,8 @@ python scripts/build_app.py cli      # (opcional) → dist/opensubtitles-uploade
 git clone git@github.com:anibalgh/opensubtitles-uploader.git
 cd opensubtitles-uploader
 poetry install -E build
-python scripts/build_app.py gui      # → dist/OpenSubtitlesUploader
-python scripts/build_app.py cli      # (opcional) → dist/opensubtitles-uploader-cli
+poetry run python scripts/build_app.py gui      # → dist/OpenSubtitlesUploader
+poetry run python scripts/build_app.py cli      # (opcional) → dist/opensubtitles-uploader-cli
 ```
 
 - Icono `.png` referenciado; los recursos (iconos + lista de idiomas) quedan
@@ -232,7 +232,7 @@ poetry run ruff format --check src tests scripts    # formato
 Verificación en vivo de cuentas/APIs (usa `.env`):
 
 ```bash
-python scripts/verify_login.py
+poetry run python scripts/verify_login.py
 ```
 
 Los tests `e2e` (red real) están desactivados por defecto:

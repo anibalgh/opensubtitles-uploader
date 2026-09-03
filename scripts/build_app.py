@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Build distributable executables with PyInstaller.
 
-Must be run **on each target platform** (PyInstaller does not cross-compile):
+Must be run **on each target platform** (PyInstaller does not cross-compile),
+and with the Poetry environment (which installs PyInstaller):
 
-    python scripts/build_app.py gui     # "OpenSubtitlesUploader" (windowed)
-    python scripts/build_app.py cli     # "opensubtitles-uploader-cli" (console)
+    poetry install -E build
+    poetry run python scripts/build_app.py gui     # "OpenSubtitlesUploader" (windowed)
+    poetry run python scripts/build_app.py cli     # "opensubtitles-uploader-cli" (console)
 
-Dependencies: ``poetry install -E build`` (adds PyInstaller).
 Output: ``dist/``.
 """
 
@@ -31,7 +32,18 @@ def _icon() -> str | None:
 
 
 def _build(windowed: bool) -> int:
-    import pyinstaller  # noqa: F401  # ensure the extra is installed
+    try:
+        import PyInstaller  # noqa: F401  # ensure the extra is installed
+    except ModuleNotFoundError:
+        print(
+            f"PyInstaller no está instalado en este intérprete ({sys.executable}).",
+            file=sys.stderr,
+        )
+        print("Ejecuta primero:", file=sys.stderr)
+        print("    poetry install -E build", file=sys.stderr)
+        print("y después usa el entorno de Poetry:", file=sys.stderr)
+        print("    poetry run python scripts/build_app.py gui", file=sys.stderr)
+        return 1
 
     name = "OpenSubtitlesUploader" if windowed else "opensubtitles-uploader-cli"
     cmd = [
@@ -60,12 +72,8 @@ def _build(windowed: bool) -> int:
         cmd += ["--icon", icon]
     if not windowed:
         cmd.append("--console")
-    entry = (
-        "opensubtitles_uploader.adapters.ui.main:main"
-        if windowed
-        else "opensubtitles_uploader.adapters.cli.main:main"
-    )
-    cmd.append(entry)
+    launcher = ROOT / "scripts" / ("launch_gui.py" if windowed else "launch_cli.py")
+    cmd.append(str(launcher))
     print("ejecutando:", " ".join(cmd))
     return subprocess.call(cmd, cwd=str(ROOT))
 
