@@ -9,7 +9,10 @@ closes.  The login inside the window validates the upload account
 
 from __future__ import annotations
 
+import os
 import sys
+
+from PySide6.QtCore import Qt
 
 from opensubtitles_uploader import __version__
 from opensubtitles_uploader.adapters.ui.i18n import Translator
@@ -18,6 +21,18 @@ from opensubtitles_uploader.adapters.ui.main_window import MainWindow
 from opensubtitles_uploader.adapters.ui.theme import apply_theme
 from opensubtitles_uploader.bootstrap import AppContext, bootstrap
 from opensubtitles_uploader.config import environment_metadata_credentials
+
+
+def _kde_session() -> bool:
+    """True when running on a KDE/Plasma desktop (native file dialogs
+    would pull in KIO and print the kf.kio.gui/systemd warnings)."""
+    if os.environ.get("KDE_FULL_SESSION") or os.environ.get("KDE_SESSION_VERSION"):
+        return True
+    desktop = (os.environ.get("XDG_CURRENT_DESKTOP") or "").lower()
+    if "kde" in desktop or "plasma" in desktop:
+        return True
+    theme = (os.environ.get("QT_QPA_PLATFORMTHEME") or "").lower()
+    return "kde" in theme or "plasma" in theme
 
 
 def metadata_startup_problem(ctx: AppContext, tr: Translator) -> str | None:
@@ -51,11 +66,19 @@ def metadata_startup_problem(ctx: AppContext, tr: Translator) -> str | None:
 def main() -> int:
     from PySide6.QtWidgets import QApplication, QMessageBox
 
+    # Quiet down Qt/KDE console noise when no accessibility service or KIO
+    # integration is available (the messages are harmless, only cosmetic).
+    os.environ.setdefault("QT_LINUX_ACCESSIBILITY_ALWAYS_ON", "0")
+
     app = QApplication(sys.argv)
     app.setApplicationName("OpenSubtitles Uploader")
     app.setApplicationVersion(__version__)
     app.setOrganizationName("anibalgh")
     app.setWindowIcon(app_icon())
+    if _kde_session():
+        # Use the Qt file dialogs instead of the KDE/KIO native ones, which
+        # print the "kf.kio.gui: Failed to determine systemd version…" noise.
+        app.setAttribute(Qt.ApplicationAttribute.AA_DontUseNativeDialogs, True)
 
     ctx = bootstrap()
     locale = str(ctx.settings.get("locale", "en") or "en")

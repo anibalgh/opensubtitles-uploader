@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from PySide6.QtGui import QColor, QPalette
+from PySide6.QtGui import QColor, QFontDatabase, QPalette
 from PySide6.QtWidgets import QApplication
 
 THEMES = ("dark", "light")
@@ -87,10 +87,10 @@ def _palette(t: Tokens) -> QPalette:
     return palette
 
 
-def stylesheet(t: Tokens) -> str:
+def stylesheet(t: Tokens, font_family: str) -> str:
     return f"""
     * {{
-        font-family: "Segoe UI", "SF Pro Text", Roboto, "Noto Sans", sans-serif;
+        font-family: "{font_family}";
         font-size: 13px;
         color: {t.text};
     }}
@@ -260,8 +260,34 @@ def stylesheet(t: Tokens) -> str:
     """
 
 
+#: UI font preference — the first family actually installed wins, so Qt
+#: never warns about missing fonts ("OpenType support missing for ...").
+_UI_FONTS = (
+    "Segoe UI",
+    "SF Pro Text",
+    "Cantarell",
+    "Ubuntu",
+    "Inter",
+    "Noto Sans",
+    "DejaVu Sans",
+    "Liberation Sans",
+)
+
+
+def choose_font_family(app: QApplication) -> str:
+    """Pick a real, installed UI font (falling back to the app default)."""
+    try:
+        available = set(QFontDatabase(app).families())
+    except Exception:  # pragma: no cover - extremely defensive
+        available = set()
+    for family in _UI_FONTS:
+        if family in available:
+            return family
+    return app.font().family()
+
+
 def apply_theme(app: QApplication, theme: str) -> None:
     name = theme if theme in TOKENS else DARK.name
     tokens = TOKENS[name]
     app.setPalette(_palette(tokens))
-    app.setStyleSheet(stylesheet(tokens))
+    app.setStyleSheet(stylesheet(tokens, choose_font_family(app)))
