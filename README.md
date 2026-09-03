@@ -226,10 +226,12 @@ poetry run python scripts/build_app.py cli      # (opcional) → dist/opensubtit
 ### Releases automáticas (GitHub Actions)
 
 El repositorio incluye `.github/workflows/release.yml`: al publicar un tag
-`v*`, se compila el binario **en paralelo para Windows, macOS y Linux**
-(matriz de runners con PyInstaller) y se publica una **GitHub Release** con
-los tres artefactos (`OpenSubtitlesUploader-windows.zip`,
-`OpenSubtitlesUploader-macos.zip`, `OpenSubtitlesUploader-linux.tar.gz`).
+`v*`, se compilan los binarios **GUI y CLI en paralelo para Windows, macOS
+y Linux** (matriz de runners con PyInstaller) y se publica una **GitHub
+Release** con los tres artefactos (`OpenSubtitlesUploader-windows.zip`,
+`OpenSubtitlesUploader-macos.zip`, `OpenSubtitlesUploader-linux.tar.gz`),
+cada uno con la GUI (`OpenSubtitlesUploader`) y la CLI
+(`opensubtitles-uploader-cli`).
 
 ```bash
 git tag v0.2.0

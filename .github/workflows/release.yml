@@ -47,12 +47,15 @@ jobs:
       - name: Build GUI binary with PyInstaller
         run: poetry run python scripts/build_app.py gui
 
+      - name: Build CLI binary with PyInstaller
+        run: poetry run python scripts/build_app.py cli
+
       - name: Prepare artifact (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist-artifact | Out-Null
-          Compress-Archive -Path "dist\OpenSubtitlesUploader" -DestinationPath "dist-artifact\OpenSubtitlesUploader-windows.zip"
+          Compress-Archive -Path "dist\OpenSubtitlesUploader","dist\opensubtitles-uploader-cli" -DestinationPath "dist-artifact\OpenSubtitlesUploader-windows.zip"
 
       - name: Prepare artifact (macOS)
         if: runner.os == 'macOS'
@@ -60,14 +63,14 @@ jobs:
         run: |
           mkdir -p dist-artifact
           cd dist
-          zip -qry ../dist-artifact/OpenSubtitlesUploader-macos.zip OpenSubtitlesUploader.app
+          zip -qry ../dist-artifact/OpenSubtitlesUploader-macos.zip OpenSubtitlesUploader.app opensubtitles-uploader-cli
 
       - name: Prepare artifact (Linux)
         if: runner.os == 'Linux'
         shell: bash
         run: |
           mkdir -p dist-artifact
-          tar -C dist -czf dist-artifact/OpenSubtitlesUploader-linux.tar.gz OpenSubtitlesUploader
+          tar -C dist -czf dist-artifact/OpenSubtitlesUploader-linux.tar.gz OpenSubtitlesUploader opensubtitles-uploader-cli
           chmod -R a+rX dist-artifact
 
       - name: Upload artifact
@@ -107,9 +110,26 @@ jobs:
           body: |
             ## OpenSubtitles Uploader — binarios por plataforma
 
-            - **Windows** → `OpenSubtitlesUploader-windows.zip` (extraer y ejecutar `OpenSubtitlesUploader.exe`)
-            - **macOS** → `OpenSubtitlesUploader-macos.zip` (extraer y abrir `OpenSubtitlesUploader.app`)
-            - **Linux** → `OpenSubtitlesUploader-linux.tar.gz` (extraer y ejecutar `OpenSubtitlesUploader/OpenSubtitlesUploader`)
+            Cada archivo contiene la **GUI** (`OpenSubtitlesUploader`) y la
+            **CLI** (`opensubtitles-uploader-cli`):
+
+            - **Windows** → `OpenSubtitlesUploader-windows.zip`
+              - GUI: `OpenSubtitlesUploader\OpenSubtitlesUploader.exe`
+              - CLI: `opensubtitles-uploader-cli\opensubtitles-uploader-cli.exe`
+            - **macOS** → `OpenSubtitlesUploader-macos.zip`
+              - GUI: `OpenSubtitlesUploader.app`
+              - CLI: `opensubtitles-uploader-cli/opensubtitles-uploader-cli`
+            - **Linux** → `OpenSubtitlesUploader-linux.tar.gz`
+              - GUI: `OpenSubtitlesUploader/OpenSubtitlesUploader`
+              - CLI: `opensubtitles-uploader-cli/opensubtitles-uploader-cli`
+
+            Ejemplo CLI:
+
+            ```
+            opensubtitles-uploader-cli --help
+            opensubtitles-uploader-cli search "The Terror"
+            opensubtitles-uploader-cli upload video.mkv sub.eng.srt --language en
+            ```
 
             ### Antes de usar el binario
             Coloca junto al ejecutable un archivo `.env` (o define las variables de entorno):
@@ -120,7 +140,8 @@ jobs:
             OPENSUBTITLES_PASSWORD=pass_metadatos_com
             ```
 
-            El **login de subida** (cuenta opensubtitles.org) se escribe dentro de la app.
+            El **login de subida** (cuenta opensubtitles.org) se escribe dentro de la app
+            (o con `opensubtitles-uploader-cli login`).
 
             > Los binarios **no están firmados**: en macOS usa clic derecho → *Abrir* la
             > primera vez; en Windows puede aparecer el aviso de SmartScreen

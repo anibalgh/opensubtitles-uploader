@@ -35,7 +35,7 @@ def login(
     ),
     remember: bool = typer.Option(True, help="Store credentials in the OS keychain"),
 ) -> None:
-    """Log in to OpenSubtitles (XML-RPC for uploads + REST user info)."""
+    """Log in with your opensubtitles.org (upload) account."""
     ctx = _context()
     user = ctx.auth.login(username, password, remember=remember)
     console.print(f"[green]✓ Logged in as {user.username} (level: {user.level or 'user'})[/green]")
