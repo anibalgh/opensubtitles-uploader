@@ -142,6 +142,27 @@ bordes, timeouts/retries, configuración 12-factor, logging estructurado),
 accesibilidad) y `python-security` (secretos nunca en texto plano, sin
 `shell=True`, validación de entrada, TLS verificado).
 
+## 📦 Empaquetado (Windows / macOS / Linux)
+
+La aplicación es multiplataforma (Qt/PySide6).  Para generar un ejecutable
+**nativo en cada sistema**, ejecute el empaquetado *en esa misma máquina*
+(PyInstaller no compila en cruz):
+
+```bash
+poetry install -E build            # añade PyInstaller
+python scripts/build_app.py gui    # genera el ejecutable con ventana
+python scripts/build_app.py cli    # genera la utilidad de consola (opcional)
+```
+
+- Resultado en `dist/` (`OpenSubtitlesUploader(.exe/.app/bin)`).
+- El icono oficial se incrusta por plataforma: `.ico` en Windows,
+  `.icns` en macOS, `.png` en Linux; los recursos (iconos + lista de
+  idiomas) se empaquetan dentro del binario.
+- Requiere **Python 3.12 o 3.13** en la máquina de compilación (PySide6 no
+  publica wheels para 3.14 todavía).
+- *(Opcional)* instale `mediainfo` o `ffprobe` junto al ejecutable para que
+  la ficha del video incluya fps/duración/fotogramas.
+
 ## 🧪 Desarrollo
 
 ```bash

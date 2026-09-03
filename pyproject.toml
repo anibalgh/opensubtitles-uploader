@@ -35,6 +35,8 @@ dependencies = [
 [project.optional-dependencies]
 # Use the operating-system keychain (instead of the encrypted local file).
 keyring = ["keyring>=24.0.0,<26.0.0"]
+# Build standalone executables with PyInstaller (run on each target OS).
+build = ["pyinstaller>=6.6.0,<7.0.0"]
 
 [project.scripts]
 opensubtitles-uploader = "opensubtitles_uploader.adapters.cli.main:app"
