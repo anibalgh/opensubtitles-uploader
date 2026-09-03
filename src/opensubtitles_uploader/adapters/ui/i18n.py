@@ -145,6 +145,7 @@ _ES: dict[str, str] = {
     "The application will close.": "La aplicación se cerrará.",
     "unknown error.": "error desconocido.",
     "The metadata account is missing: create a .env file with OPENSUBTITLES_USERNAME and OPENSUBTITLES_PASSWORD (opensubtitles.com credentials).": "Falta la cuenta de metadatos: crea un archivo .env con OPENSUBTITLES_USERNAME y OPENSUBTITLES_PASSWORD (credenciales de opensubtitles.com).",
+    "Put the .env file next to the application (or export OPENSUBTITLES_USERNAME, OPENSUBTITLES_PASSWORD and OPENSUBTITLES_API_KEY as environment variables).": "Coloca el archivo .env junto a la aplicación (o exporta OPENSUBTITLES_USERNAME, OPENSUBTITLES_PASSWORD y OPENSUBTITLES_API_KEY como variables de entorno).",
     "The OpenSubtitles API key is missing: set OPENSUBTITLES_API_KEY (opensubtitles.com) to validate the metadata account.": "Falta la clave de API de OpenSubtitles: define OPENSUBTITLES_API_KEY (opensubtitles.com) para validar la cuenta de metadatos.",
     "The metadata account could not be validated against opensubtitles.com:": "La cuenta de metadatos no pudo validarse contra opensubtitles.com:",
 }

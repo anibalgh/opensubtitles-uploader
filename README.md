@@ -211,6 +211,10 @@ poetry run python scripts/build_app.py cli      # (opcional) → dist/opensubtit
 - El script `scripts/build_app.py` incluye automáticamente la carpeta de
   datos (`os_languages.json` + iconos) dentro del binario; los ajustes,
   secretos y `.env` **no** se empaquetan (se leen del usuario al ejecutar).
+- Al ejecutar el binario, el `.env` se busca: **junto al ejecutable**,
+  en el directorio actual, en la raíz del repo (desarrollo) y en la carpeta
+  de configuración del usuario.  Si falta, la app lo indica y se cierra
+  (también puede exportar las variables como entorno real).
 - Entradas: GUI → `opensubtitles_uploader.adapters.ui.main:main`
   (sin consola), CLI → `opensubtitles_uploader.adapters.cli.main:main`.
 - Resultado en `dist/`; artefactos intermedios en `build/` (ignorados por

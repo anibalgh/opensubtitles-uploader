@@ -43,10 +43,18 @@ def metadata_startup_problem(ctx: AppContext, tr: Translator) -> str | None:
     """
     creds = environment_metadata_credentials()
     if not creds:
-        return tr.tr(
-            "The metadata account is missing: create a .env file with "
-            "OPENSUBTITLES_USERNAME and OPENSUBTITLES_PASSWORD "
-            "(opensubtitles.com credentials)."
+        return (
+            tr.tr(
+                "The metadata account is missing: create a .env file with "
+                "OPENSUBTITLES_USERNAME and OPENSUBTITLES_PASSWORD "
+                "(opensubtitles.com credentials)."
+            )
+            + "\n\n"
+            + tr.tr(
+                "Put the .env file next to the application (or export "
+                "OPENSUBTITLES_USERNAME, OPENSUBTITLES_PASSWORD and "
+                "OPENSUBTITLES_API_KEY as environment variables)."
+            )
         )
     if not ctx.api_key.resolve():
         return tr.tr(

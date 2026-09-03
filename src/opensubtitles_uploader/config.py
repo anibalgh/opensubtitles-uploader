@@ -19,6 +19,7 @@ always win.
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 from platformdirs import user_config_dir, user_data_dir
@@ -43,17 +44,40 @@ OS_BASE_URL = os.environ.get("OPENSUBTITLES_BASE_URL", "https://api.opensubtitle
 #: Request timeouts (seconds).
 HTTP_TIMEOUT = float(os.environ.get("OPENSUBTITLES_HTTP_TIMEOUT", "30"))
 
-#: Repo root (one level above the ``src`` package) — used to find ``.env``.
+#: Repo root (one level above the ``src`` package) — dev-only .env location.
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _dotenv_candidates() -> tuple[Path, ...]:
-    return (Path.cwd() / ".env", _REPO_ROOT / ".env")
+def dotenv_candidates() -> list[Path]:
+    """Where a local ``.env`` file may live, in lookup order.
+
+    - beside the frozen executable (distributed binaries);
+    - in the current working directory;
+    - in the repository root (development);
+    - in the per-user configuration directory.
+    """
+    candidates: list[Path] = []
+    if getattr(sys, "frozen", False):
+        candidates.append(Path(sys.executable).resolve().parent / ".env")
+    candidates.append(Path.cwd() / ".env")
+    candidates.append(_REPO_ROOT / ".env")
+    candidates.append(user_config_path() / ".env")
+    seen: set[Path] = set()
+    unique: list[Path] = []
+    for candidate in candidates:
+        if candidate not in seen:
+            seen.add(candidate)
+            unique.append(candidate)
+    return unique
 
 
 def load_dotenv() -> None:
-    """Load ``KEY=VALUE`` lines from a local ``.env`` file (no override)."""
-    for dotenv in _dotenv_candidates():
+    """Load ``KEY=VALUE`` lines from a local ``.env`` file (no override).
+
+    Real environment variables always win (``setdefault``); the first
+    existing ``.env`` found is used.
+    """
+    for dotenv in dotenv_candidates():
         if not dotenv.is_file():
             continue
         try:
