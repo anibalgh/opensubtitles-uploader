@@ -201,17 +201,25 @@ class MainWindow(QMainWindow):
         login_row.setContentsMargins(0, 0, 0, 0)
         login_row.setSpacing(6)
 
+        upload_hint = self.tr.tr(
+            "Upload account — opensubtitles.org credentials. The .env "
+            "(opensubtitles.com) account is used only for metadata/search."
+        )
         self._login_username = QLineEdit()
         self._login_username.setPlaceholderText(self.tr.tr("Username"))
         self._login_username.setMaximumWidth(150)
+        self._login_username.setToolTip(upload_hint)
         self._login_password = QLineEdit()
         self._login_password.setPlaceholderText(self.tr.tr("Password"))
         self._login_password.setEchoMode(QLineEdit.Password)
         self._login_password.setMaximumWidth(150)
+        self._login_password.setToolTip(upload_hint)
         self._login_password.returnPressed.connect(self._do_login)
         self._remember = QCheckBox(self.tr.tr("Remember me"))
+        self._remember.setToolTip(upload_hint)
         self._remember.setChecked(True)
         self._login_button = QPushButton(self.tr.tr("Log in"))
+        self._login_button.setToolTip(upload_hint)
         self._login_button.clicked.connect(self._do_login)
 
         self._login_username.returnPressed.connect(lambda: self._login_password.setFocus())

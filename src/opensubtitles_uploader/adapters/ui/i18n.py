@@ -82,6 +82,7 @@ _ES: dict[str, str] = {
     "Enter a title": "Escribe un título",
     "Search account:": "Cuenta de búsqueda:",
     "log in above with your upload account to submit subtitles.": "inicia sesión arriba con tu cuenta de subida para enviar subtítulos.",
+    "Upload account — opensubtitles.org credentials. The .env (opensubtitles.com) account is used only for metadata/search.": "Cuenta de subida — credenciales de opensubtitles.org. La cuenta del .env (opensubtitles.com) se usa solo para metadatos/búsqueda.",
     "Search is ready (API key). Log in with your upload account to submit subtitles.": "Búsqueda lista (API key). Inicia sesión con tu cuenta de subida para enviar subtítulos.",
     "Configure an OpenSubtitles API key (⚙) to enable movie search.": "Configura una clave de API de OpenSubtitles (⚙) para buscar películas.",
     "Metadata/search account": "Cuenta de metadatos/búsqueda",
