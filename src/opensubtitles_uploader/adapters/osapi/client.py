@@ -287,55 +287,94 @@ class OpenSubtitlesClient:
 
     def _require_xml_token(self) -> str:
         if not self._xml_token:
-            raise AuthError("Log in to OpenSubtitles before uploading.", code="auth_required")
+            raise AuthError(
+                "Log in with an opensubtitles.org (legacy) account to upload.",
+                code="upload_account_required",
+            )
         return self._xml_token
 
     # ------------------------------------------------------------------
     # Auth
     # ------------------------------------------------------------------
     def login(self, username: str, password: str) -> Session:
-        # XML-RPC login (needed for uploads).
-        self._xml_token = self._xmlrpc.login(username, password)
+        """Hybrid login.
 
-        # REST login for user info (needs the application Api-Key).
-        user: UserInfo | None = None
+        The modern OpenSubtitles account (opensubtitles.com) is validated
+        through REST ``/login`` (user info, catalogue); uploads still run
+        on the legacy XML-RPC endpoint, which uses its **own** credential
+        database.  We try both:
+
+        - legacy XML-RPC OK  → ``UserInfo.upload_capable`` is true;
+        - REST OK            → profile (level/VIP) is filled in;
+        - both OK            → full session;
+        - only REST OK       → logged in but cannot upload (modern-only
+          account) — the UI informs the user.
+        """
+        # 1) Legacy XML-RPC session (used for uploads).
+        xml_ok = False
         try:
-            payload = self._rest(
-                "POST", "/login", json_body={"username": username, "password": password}
-            )
-            token = payload.get("token")
-            if token:
-                self._rest_token = str(token)
-                base = payload.get("base_url")
-                if isinstance(base, str) and base.startswith("http"):
-                    self._rest_base = base
-            raw_user = payload.get("user") or {}
-            user = UserInfo(
-                user_id=_as_int(raw_user.get("user_id")) or 0,
-                username=str(raw_user.get("username") or username),
-                level=str(raw_user.get("level") or "user"),
-                vip=bool(raw_user.get("vip")),
-            )
-        except ApiError:
-            user = None
+            self._xml_token = self._xmlrpc.login(username, password)
+            xml_ok = True
+        except AuthError:
+            self._xml_token = None
+
+        # 2) REST login for the profile (needs the application Api-Key).
+        user: UserInfo | None = None
+        rest_error: ApiError | None = None
+        if self._api_key.resolve():
+            try:
+                payload = self._rest(
+                    "POST", "/login", json_body={"username": username, "password": password}
+                )
+                token = payload.get("token")
+                if token:
+                    self._rest_token = str(token)
+                    base = payload.get("base_url")
+                    if isinstance(base, str) and base.startswith("http"):
+                        self._rest_base = base
+                raw_user = payload.get("user") or {}
+                user = UserInfo(
+                    user_id=_as_int(raw_user.get("user_id")) or 0,
+                    username=str(raw_user.get("username") or username),
+                    level=str(raw_user.get("level") or "user"),
+                    vip=bool(raw_user.get("vip")),
+                    upload_capable=xml_ok,
+                )
+            except ApiError as exc:
+                rest_error = exc
 
         if user is None:
-            user = UserInfo(user_id=0, username=username, level="user")
+            if xml_ok:
+                # REST unavailable (no key / rate limited): keep the legacy
+                # session, which is all the upload flow needs.
+                user = UserInfo(
+                    user_id=0,
+                    username=username,
+                    level="user",
+                    upload_capable=True,
+                )
+            elif rest_error is not None:
+                # The REST answer is authoritative about the credentials.
+                raise AuthError(rest_error.message, code="auth_error")
+            else:
+                raise AuthError("Wrong username or password", code="auth_error")
+
         self._user = user
-        return Session(token=self._xml_token or "", user=user, base_url=self._rest_base)
+        token = self._xml_token or self._rest_token or ""
+        return Session(token=token, user=user, base_url=self._rest_base)
 
     def whoami(self) -> UserInfo:
         if self._rest_token and self._api_key.resolve():
             try:
                 payload = self._rest("GET", "/infos/user")
                 data = payload.get("data") or {}
+                previous = self._user
                 user = UserInfo(
                     user_id=_as_int(data.get("user_id")) or 0,
-                    username=str(
-                        data.get("username") or (self._user.username if self._user else "")
-                    ),
+                    username=str(data.get("username") or (previous.username if previous else "")),
                     level=str(data.get("level") or "user"),
                     vip=bool(data.get("vip")),
+                    upload_capable=bool(previous and previous.upload_capable),
                 )
                 self._user = user
                 return user

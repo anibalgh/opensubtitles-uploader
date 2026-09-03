@@ -152,6 +152,13 @@ archivo `.env` (ignorado por git) con `OPENSUBTITLES_USERNAME`,
 - Esta aplicación **no es** OpenSubtitles: usa su API pública y depende de su
   disponibilidad.  Un error `503/506` suele significar mantenimiento o caída
   temporal del servicio.
+- **Cuentas `.com` vs `.org`**: el login y la búsqueda usan la cuenta moderna
+  de opensubtitles.com.  La *subida* sigue exigiendo una cuenta del sistema
+  heredado (`opensubtitles.org`), cuyas bases de datos están separadas: si tu
+  cuenta es solo `.com`, el login funcionará (perfil, búsqueda…) pero la
+  subida avisará de que necesita una cuenta `.org` con las mismas credenciales.
+  Ejecute `python scripts/verify_login.py` para ver en vivo el estado de su
+  cuenta.
 - El hash MD5 de subtítulos se usa solo como huella de contenido (requisito
   del servicio); no se emplea para contraseñas.
 - La clave de API y las credenciales se guardan en el almacén de secretos del

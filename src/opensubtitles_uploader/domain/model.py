@@ -86,6 +86,7 @@ class UserInfo:
     username: str
     level: str = ""
     vip: bool = False
+    upload_capable: bool = False
 
 
 @dataclass(frozen=True)

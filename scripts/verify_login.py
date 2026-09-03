@@ -87,7 +87,9 @@ def main() -> int:
     print("\n2) Login con contraseña INCORRECTA (debe fallar limpio)")
     bogus = f"osu_verify_{int(time.time())}"
     try:
-        client.login(bogus, "definitely-wrong-password")
+        # XML-RPC only — REST /login is rate-limited to 1 req/s and is
+        # reserved for the real-login test below.
+        client._xmlrpc.login(bogus, "definitely-wrong-password")
         results.append(check("El servidor aceptó credenciales falsas (¡problema!)", False))
     except AuthError as exc:
         msg = str(exc)
@@ -114,28 +116,41 @@ def main() -> int:
     if not (username and password):
         print("   (sin credenciales: se omite. Crea un archivo .env o exporta las variables)")
     else:
-        try:
-            session = client.login(username, password)
-            results.append(
-                check(
-                    "Login real OK (token XML-RPC + sesión)",
-                    bool(session.token),
-                    f"usuario: {session.user.username}",
+        for attempt in (1, 2):  # retry once on REST rate limit (1 req/s)
+            try:
+                session = client.login(username, password)
+                user = session.user
+                results.append(
+                    check(
+                        "Login real OK (sesión REST/XML válida)",
+                        bool(session.token or user.user_id),
+                        f"usuario: {user.username} · nivel: {user.level or 'user'}",
+                    )
                 )
-            )
-            if api_key:
-                try:
-                    user = client.whoami()
-                    results.append(check("whoami REST OK", bool(user.user_id), f"{user.level}"))
-                except Exception as exc:  # pragma: no cover
-                    results.append(check(f"whoami — {exc}", False))
-        except AuthError as exc:
-            results.append(check(f"Login real rechazado: {exc}", False))
-        except Exception as exc:  # pragma: no cover
-            results.append(check(f"Login real — error inesperado: {exc}", False))
-        finally:
-            with contextlib.suppress(Exception):
-                client.logout()
+                if not user.upload_capable:
+                    # The legacy .org upload database is separate from .com
+                    # accounts; this is a capability warning, not a login failure.
+                    print("   [i] cuenta sin acceso de subida (XML-RPC .org la rechaza):")
+                    print("       el login/búsqueda funcionan; la subida necesita una cuenta .org.")
+                if api_key:
+                    try:
+                        fresh = client.whoami()
+                        results.append(
+                            check("whoami REST OK", bool(fresh.user_id), f"{fresh.level}")
+                        )
+                    except Exception as exc:  # pragma: no cover
+                        results.append(check(f"whoami — {exc}", False))
+                break
+            except AuthError as exc:
+                if "rate limit" in str(exc).lower() and attempt == 1:
+                    time.sleep(2.0)
+                    continue
+                results.append(check(f"Login real rechazado: {exc}", False))
+            except Exception as exc:  # pragma: no cover
+                results.append(check(f"Login real — error inesperado: {exc}", False))
+                break
+        with contextlib.suppress(Exception):
+            client.logout()
 
     print()
     failures = sum(1 for ok in results if not ok)

@@ -456,8 +456,8 @@ class MainWindow(QMainWindow):
         if text:
             self._status_message(text)
 
-    def _status_message(self, text: str) -> None:
-        self.statusBar().showMessage(text, 6000)
+    def _status_message(self, text: str, timeout: int = 6000) -> None:
+        self.statusBar().showMessage(text, timeout)
 
     def _on_task_error(self, exc: Exception) -> None:
         code = exc.code if isinstance(exc, DomainError) else "generic_error"
@@ -789,7 +789,16 @@ class MainWindow(QMainWindow):
         self._logged_label.setText("👤 " + user.username)
         self._login_widget.hide()
         self._logged_widget.show()
-        self._status_message(self.tr.tr("Logged in as") + f" {user.username}")
+        if not getattr(user, "upload_capable", True):
+            self._status_message(
+                self.tr.tr(
+                    "Uploads need a legacy opensubtitles.org account — this "
+                    "opensubtitles.com login works for search but not for uploading."
+                ),
+                9000,
+            )
+        else:
+            self._status_message(self.tr.tr("Logged in as") + f" {user.username}")
 
     def _do_logout(self) -> None:
         self.ctx.auth.logout()
