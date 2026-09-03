@@ -4,9 +4,11 @@ These are **disabled by default**: they need a real account and an API key.
 
 Run with:
 
-    export OPENSUBTITLES_API_KEY=…
-    export OPENSUBTITLES_USERNAME=…
+    export OPENSUBTITLES_API_KEY=…            # application API key
+    export OPENSUBTITLES_USERNAME=…           # metadata/catalogue account (.env)
     export OPENSUBTITLES_PASSWORD=…
+    export OPENSUBTITLES_UPLOAD_USERNAME=…    # optional: GUI upload account
+    export OPENSUBTITLES_UPLOAD_PASSWORD=…
     poetry run pytest -m e2e
 """
 
@@ -19,29 +21,41 @@ import pytest
 pytestmark = pytest.mark.e2e
 
 API_KEY = os.environ.get("OPENSUBTITLES_API_KEY", "")
-USERNAME = os.environ.get("OPENSUBTITLES_USERNAME", "")
-PASSWORD = os.environ.get("OPENSUBTITLES_PASSWORD", "")
+META_USER = os.environ.get("OPENSUBTITLES_USERNAME", "")
+META_PASS = os.environ.get("OPENSUBTITLES_PASSWORD", "")
+UPLOAD_USER = os.environ.get("OPENSUBTITLES_UPLOAD_USERNAME", "")
+UPLOAD_PASS = os.environ.get("OPENSUBTITLES_UPLOAD_PASSWORD", "")
 
-needs_credentials = pytest.mark.skipif(
-    not (API_KEY and USERNAME and PASSWORD),
+needs_catalogue = pytest.mark.skipif(
+    not (API_KEY and META_USER and META_PASS),
     reason="OPENSUBTITLES_API_KEY/USERNAME/PASSWORD not set",
+)
+needs_upload = pytest.mark.skipif(
+    not (UPLOAD_USER and UPLOAD_PASS),
+    reason="OPENSUBTITLES_UPLOAD_USERNAME/PASSWORD not set",
 )
 
 
-@needs_credentials
-def test_live_login_and_catalog():
+def _client(tmp_path_factory):
     from opensubtitles_uploader.adapters.osapi.client import OpenSubtitlesClient
     from opensubtitles_uploader.adapters.osapi.keys import ApiKeySource
     from opensubtitles_uploader.adapters.storage.secret_store import FernetSecretStore
-    from opensubtitles_uploader.config import user_config_path
 
-    vault = FernetSecretStore(user_config_path() / "test-e2e")
+    vault = FernetSecretStore(tmp_path_factory.mktemp("e2e"))
     vault.set_secret("opensubtitles-uploader", "__api_key__", API_KEY)
-    client = OpenSubtitlesClient(api_key=ApiKeySource(vault))
+    return OpenSubtitlesClient(api_key=ApiKeySource(vault))
 
-    session = client.login(USERNAME, PASSWORD)
-    assert session.token
-    assert session.user.username
+
+@needs_catalogue
+def test_live_metadata_catalogue(tmp_path_factory, monkeypatch):
+    """The .env (metadata) account must drive search and REST login."""
+    monkeypatch.setenv("OPENSUBTITLES_USERNAME", META_USER)
+    monkeypatch.setenv("OPENSUBTITLES_PASSWORD", META_PASS)
+    client = _client(tmp_path_factory)
+
+    user = client.ensure_metadata_session()
+    assert user is not None and user.username
+    assert user.upload_capable is False  # metadata account never uploads
 
     languages = client.languages()
     assert any(lang.iso639_1 == "en" for lang in languages)
@@ -52,19 +66,11 @@ def test_live_login_and_catalog():
     client.logout()
 
 
-@needs_credentials
-def test_live_hash_round_trip():
-    """A real moviehash should be identifiable without uploading anything."""
-    from opensubtitles_uploader.adapters.osapi.client import OpenSubtitlesClient
-    from opensubtitles_uploader.adapters.osapi.keys import ApiKeySource
-    from opensubtitles_uploader.adapters.storage.secret_store import FernetSecretStore
-    from opensubtitles_uploader.config import user_config_path
-
-    vault = FernetSecretStore(user_config_path() / "test-e2e")
-    vault.set_secret("opensubtitles-uploader", "__api_key__", API_KEY)
-    client = OpenSubtitlesClient(api_key=ApiKeySource(vault))
-    # Known public sample: hash of a well-known file used in OS docs.
-    movie = client.identify("8e245d9679d31e12", 132393969)
-    # Identification may legitimately return None for hashes unknown to the DB,
-    # so we only assert the call does not raise and returns a MovieRef or None.
-    assert movie is None or movie.imdb_id
+@needs_upload
+def test_live_upload_login(tmp_path_factory):
+    """The GUI (upload) account must authenticate on XML-RPC."""
+    client = _client(tmp_path_factory)
+    session = client.login(UPLOAD_USER, UPLOAD_PASS)
+    assert session.token
+    assert session.user.upload_capable is True
+    client.logout()

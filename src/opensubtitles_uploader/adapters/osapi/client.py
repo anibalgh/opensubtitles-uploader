@@ -17,6 +17,7 @@ import base64
 import contextlib
 import gzip
 import hashlib
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -25,7 +26,11 @@ import httpx
 from opensubtitles_uploader.adapters.media.dataset import bundled_language_index
 from opensubtitles_uploader.adapters.osapi.keys import ApiKeySource
 from opensubtitles_uploader.adapters.osapi.xmlrpc import XmlRpcClient
-from opensubtitles_uploader.config import HTTP_TIMEOUT, OS_BASE_URL
+from opensubtitles_uploader.config import (
+    HTTP_TIMEOUT,
+    OS_BASE_URL,
+    environment_metadata_credentials,
+)
 from opensubtitles_uploader.domain.errors import (
     ApiError,
     AuthError,
@@ -202,10 +207,15 @@ class OpenSubtitlesClient:
         self._user_agent = user_agent
         self._rest_base = rest_base_url.rstrip("/")
 
-        # session state (single-user desktop application)
+        # --- upload session (GUI login -> legacy XML-RPC endpoint) -------
         self._xml_token: str | None = None
+        self._upload_user: UserInfo | None = None
+
+        # --- metadata/catalogue session (REST, credentials from .env) ----
         self._rest_token: str | None = None
-        self._user: UserInfo | None = None
+        self._rest_user: UserInfo | None = None
+        self._metadata_attempted = False
+        self._metadata_lock = threading.Lock()
 
         self._http = httpx.Client(
             timeout=httpx.Timeout(timeout),
@@ -297,108 +307,93 @@ class OpenSubtitlesClient:
     # Auth
     # ------------------------------------------------------------------
     def login(self, username: str, password: str) -> Session:
-        """Hybrid login.
+        """Upload login (GUI) — the *legacy XML-RPC* account.
 
-        The modern OpenSubtitles account (opensubtitles.com) is validated
-        through REST ``/login`` (user info, catalogue); uploads still run
-        on the legacy XML-RPC endpoint, which uses its **own** credential
-        database.  We try both:
-
-        - legacy XML-RPC OK  → ``UserInfo.upload_capable`` is true;
-        - REST OK            → profile (level/VIP) is filled in;
-        - both OK            → full session;
-        - only REST OK       → logged in but cannot upload (modern-only
-          account) — the UI informs the user.
+        The credentials typed in the GUI belong to the opensubtitles.org
+        upload world.  Catalogue/metadata lookups are a separate concern
+        driven by :meth:`ensure_metadata_session` (.env credentials), so
+        this method does **not** touch REST /login.
         """
-        # 1) Legacy XML-RPC session (used for uploads).
-        xml_ok = False
-        try:
-            self._xml_token = self._xmlrpc.login(username, password)
-            xml_ok = True
-        except AuthError:
-            self._xml_token = None
+        self._xml_token = self._xmlrpc.login(username, password)  # raises AuthError
+        user = UserInfo(user_id=0, username=username, level="user", upload_capable=True)
+        self._upload_user = user
+        return Session(token=self._xml_token or "", user=user, base_url=self._rest_base)
 
-        # 2) REST login for the profile (needs the application Api-Key).
-        user: UserInfo | None = None
-        rest_error: ApiError | None = None
-        if self._api_key.resolve():
+    def ensure_metadata_session(self) -> UserInfo | None:
+        """Log the REST/catalogue account (credentials from ``.env``) in once.
+
+        Idempotent and thread-safe.  Returns the metadata profile, or
+        ``None`` when no credentials/API key are configured or the login
+        fails (the catalogue keeps working with the plain ``Api-Key``).
+        """
+        creds = environment_metadata_credentials()
+        if not creds or not self._api_key.resolve():
+            self._metadata_attempted = True
+            return self._rest_user
+        with self._metadata_lock:
+            if self._metadata_attempted:
+                return self._rest_user
+            self._metadata_attempted = True
+            username, password = creds
             try:
                 payload = self._rest(
                     "POST", "/login", json_body={"username": username, "password": password}
                 )
-                token = payload.get("token")
-                if token:
-                    self._rest_token = str(token)
-                    base = payload.get("base_url")
-                    if isinstance(base, str) and base.startswith("http"):
-                        self._rest_base = base
-                raw_user = payload.get("user") or {}
-                user = UserInfo(
-                    user_id=_as_int(raw_user.get("user_id")) or 0,
-                    username=str(raw_user.get("username") or username),
-                    level=str(raw_user.get("level") or "user"),
-                    vip=bool(raw_user.get("vip")),
-                    upload_capable=xml_ok,
-                )
-            except ApiError as exc:
-                rest_error = exc
+            except ApiError:
+                return None
+            token = payload.get("token")
+            if token:
+                self._rest_token = str(token)
+                base = payload.get("base_url")
+                if isinstance(base, str) and base.startswith("http"):
+                    self._rest_base = base
+            raw_user = payload.get("user") or {}
+            self._rest_user = UserInfo(
+                user_id=_as_int(raw_user.get("user_id")) or 0,
+                username=str(raw_user.get("username") or username),
+                level=str(raw_user.get("level") or "user"),
+                vip=bool(raw_user.get("vip")),
+                upload_capable=False,  # metadata account never uploads
+            )
+            return self._rest_user
 
-        if user is None:
-            if xml_ok:
-                # REST unavailable (no key / rate limited): keep the legacy
-                # session, which is all the upload flow needs.
-                user = UserInfo(
-                    user_id=0,
-                    username=username,
-                    level="user",
-                    upload_capable=True,
-                )
-            elif rest_error is not None:
-                # The REST answer is authoritative about the credentials.
-                raise AuthError(rest_error.message, code="auth_error")
-            else:
-                raise AuthError("Wrong username or password", code="auth_error")
-
-        self._user = user
-        token = self._xml_token or self._rest_token or ""
-        return Session(token=token, user=user, base_url=self._rest_base)
+    def metadata_user(self) -> UserInfo | None:
+        """The current metadata/catalogue profile (without logging in)."""
+        return self._rest_user
 
     def whoami(self) -> UserInfo:
-        if self._rest_token and self._api_key.resolve():
-            try:
-                payload = self._rest("GET", "/infos/user")
-                data = payload.get("data") or {}
-                previous = self._user
-                user = UserInfo(
-                    user_id=_as_int(data.get("user_id")) or 0,
-                    username=str(data.get("username") or (previous.username if previous else "")),
-                    level=str(data.get("level") or "user"),
-                    vip=bool(data.get("vip")),
-                    upload_capable=bool(previous and previous.upload_capable),
-                )
-                self._user = user
-                return user
-            except ApiError:
-                pass
-        if self._user:
-            return self._user
+        """Prefer the metadata (.env) profile, then the upload (GUI) one."""
+        if self._rest_user is None:
+            self.ensure_metadata_session()
+        if self._rest_user:
+            return self._rest_user
+        if self._upload_user:
+            return self._upload_user
         raise AuthError("Not logged in.", code="auth_required")
 
     def logout(self) -> None:
+        """Revoke the upload (GUI) session and the REST bearer.
+
+        The metadata account comes from configuration (.env), so the next
+        catalogue call simply re-authenticates it.
+        """
         if self._xml_token:
             self._xmlrpc.logout(self._xml_token)
         if self._rest_token:
             with contextlib.suppress(ApiError):
                 self._rest("DELETE", "/logout")
         self._xml_token = None
+        self._upload_user = None
         self._rest_token = None
-        self._user = None
+        self._rest_user = None
+        self._metadata_attempted = False
 
     # ------------------------------------------------------------------
     # Catalog
     # ------------------------------------------------------------------
     def identify(self, moviehash: str, moviebytesize: int) -> MovieRef | None:
         """Map a video hash to a movie via subtitle search (REST)."""
+        self.ensure_metadata_session()
         payload = self._rest(
             "GET",
             "/subtitles",
@@ -430,6 +425,7 @@ class OpenSubtitlesClient:
         return results[0] if results else None
 
     def search_features(self, query: str) -> list[MovieRef]:
+        self.ensure_metadata_session()
         payload = self._rest("GET", "/features", params={"query": query, "full_search": "1"})
         results: list[MovieRef] = []
         for item in payload.get("data", []):
@@ -440,6 +436,7 @@ class OpenSubtitlesClient:
         return results
 
     def feature_details(self, imdb_id: str) -> MovieRef | None:
+        self.ensure_metadata_session()
         digits = imdb_id.lower().lstrip("t")
         if not digits.isdigit():
             return None

@@ -1,25 +1,16 @@
 #!/usr/bin/env python3
-"""Verify that login (and the OpenSubtitles APIs) really work.
+"""Verify the two credential scopes of OpenSubtitles Uploader.
 
-It performs, in order:
+The application separates:
 
-1. **XML-RPC legacy** (used for the upload login): checks the endpoint is
-   reachable via an anonymous ``GetSubLanguages`` call, then proves the
-   whole login plumbing with a deliberately *wrong* password — the server
-   must answer with a clean 401-style fault that our client maps to an
-   :class:`AuthError` ("Wrong username or password").
-2. **REST** (used for catalogue/search): when an API key is configured,
-   runs a real feature search and, with credentials, a real ``/login`` +
-   ``/infos/user``.
-3. **Real login**: only when credentials are provided (see below), logs in
-   for real and prints the user profile.
-
-Credentials are read from the environment or from an optional ``.env``
-file in the project root (never committed):
-
-    OPENSUBTITLES_USERNAME=your_user
-    OPENSUBTITLES_PASSWORD=your_password
-    OPENSUBTITLES_API_KEY=your_api_key
+1. **Metadata/catalogue account** — REST (opensubtitles.com): search,
+   movie identification, profile.  Credentials come from
+   ``OPENSUBTITLES_USERNAME`` / ``OPENSUBTITLES_PASSWORD`` (a local
+   ``.env`` file is loaded automatically).  It never uploads.
+2. **Upload account** — legacy XML-RPC (opensubtitles.org), the one typed
+   in the GUI / CLI ``login`` command.  It is the only one that can
+   upload.  For scripted checks use ``OPENSUBTITLES_UPLOAD_USERNAME`` /
+   ``OPENSUBTITLES_UPLOAD_PASSWORD``.
 
 Usage:
 
@@ -32,26 +23,16 @@ import contextlib
 import os
 import sys
 import time
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[1] / "src"))
 
-from opensubtitles_uploader.adapters.osapi.client import OpenSubtitlesClient  # noqa: E402
-from opensubtitles_uploader.adapters.osapi.keys import ApiKeySource  # noqa: E402
-from opensubtitles_uploader.domain.errors import ApiError, AuthError  # noqa: E402
-
-
-def _load_dotenv() -> None:
-    env_file = ROOT / ".env"
-    if not env_file.is_file():
-        return
-    for raw in env_file.read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+from opensubtitles_uploader.adapters.osapi.client import OpenSubtitlesClient
+from opensubtitles_uploader.adapters.osapi.keys import ApiKeySource
+from opensubtitles_uploader.config import (
+    environment_metadata_credentials,
+    environment_upload_credentials,
+)
+from opensubtitles_uploader.domain.errors import ApiError, AuthError
 
 
 def check(name: str, ok: bool, detail: str = "") -> bool:
@@ -61,10 +42,9 @@ def check(name: str, ok: bool, detail: str = "") -> bool:
 
 
 def main() -> int:
-    _load_dotenv()
-    username = os.environ.get("OPENSUBTITLES_USERNAME", "")
-    password = os.environ.get("OPENSUBTITLES_PASSWORD", "")
     api_key = os.environ.get("OPENSUBTITLES_API_KEY", "")
+    metadata = environment_metadata_credentials()
+    upload = environment_upload_credentials()
 
     client = OpenSubtitlesClient(
         api_key=ApiKeySource(None), user_agent="OpenSubtitles-Uploader v0.1.0 (verify)"
@@ -84,11 +64,10 @@ def main() -> int:
     except Exception as exc:  # pragma: no cover
         results.append(check(f"GetSubLanguages — {exc}", False))
 
-    print("\n2) Login con contraseña INCORRECTA (debe fallar limpio)")
+    print("\n2) Login de subida con contraseña INCORRECTA (debe fallar limpio)")
     bogus = f"osu_verify_{int(time.time())}"
     try:
-        # XML-RPC only — REST /login is rate-limited to 1 req/s and is
-        # reserved for the real-login test below.
+        # XML-RPC only — REST /login is rate-limited and belongs to scope (1).
         client._xmlrpc.login(bogus, "definitely-wrong-password")
         results.append(check("El servidor aceptó credenciales falsas (¡problema!)", False))
     except AuthError as exc:
@@ -99,7 +78,7 @@ def main() -> int:
     except Exception as exc:  # pragma: no cover
         results.append(check(f"Error inesperado en login: {exc}", False))
 
-    print("\n3) REST — búsqueda y login (requiere OPENSUBTITLES_API_KEY)")
+    print("\n3) Cuenta de METADATOS (.env, REST)")
     if not api_key:
         results.append(check("Sin Api-Key: la búsqueda avisa correctamente", _no_key_hint(client)))
         print("   (configura OPENSUBTITLES_API_KEY para probar REST de verdad)")
@@ -109,48 +88,51 @@ def main() -> int:
             results.append(check("search_features('Inception')", found))
         except Exception as exc:  # pragma: no cover
             results.append(check(f"search_features — {exc}", False))
-        with contextlib.suppress(Exception):
-            client._api_key.store(api_key)
-
-    print("\n4) Login REAL (requiere OPENSUBTITLES_USERNAME y PASSWORD)")
-    if not (username and password):
-        print("   (sin credenciales: se omite. Crea un archivo .env o exporta las variables)")
-    else:
-        for attempt in (1, 2):  # retry once on REST rate limit (1 req/s)
-            try:
-                session = client.login(username, password)
-                user = session.user
-                results.append(
-                    check(
-                        "Login real OK (sesión REST/XML válida)",
-                        bool(session.token or user.user_id),
-                        f"usuario: {user.username} · nivel: {user.level or 'user'}",
-                    )
-                )
-                if not user.upload_capable:
-                    # The legacy .org upload database is separate from .com
-                    # accounts; this is a capability warning, not a login failure.
-                    print("   [i] cuenta sin acceso de subida (XML-RPC .org la rechaza):")
-                    print("       el login/búsqueda funcionan; la subida necesita una cuenta .org.")
-                if api_key:
-                    try:
-                        fresh = client.whoami()
-                        results.append(
-                            check("whoami REST OK", bool(fresh.user_id), f"{fresh.level}")
+        if metadata:
+            for attempt in (1, 2):
+                try:
+                    user = client.ensure_metadata_session()
+                    results.append(
+                        check(
+                            "Login REST (metadatos) OK",
+                            user is not None,
+                            f"usuario: {user.username} · nivel: {user.level}" if user else "",
                         )
-                    except Exception as exc:  # pragma: no cover
-                        results.append(check(f"whoami — {exc}", False))
-                break
-            except AuthError as exc:
-                if "rate limit" in str(exc).lower() and attempt == 1:
-                    time.sleep(2.0)
-                    continue
-                results.append(check(f"Login real rechazado: {exc}", False))
-            except Exception as exc:  # pragma: no cover
-                results.append(check(f"Login real — error inesperado: {exc}", False))
-                break
-        with contextlib.suppress(Exception):
-            client.logout()
+                    )
+                    break
+                except Exception as exc:  # pragma: no cover
+                    if attempt == 1 and "rate" in str(exc).lower():
+                        time.sleep(2.0)
+                        continue
+                    results.append(check(f"Login REST — {exc}", False))
+                    break
+            if client.metadata_user():
+                results.append(check("whoami (metadatos) OK", True))
+        else:
+            print("   (OPENSUBTITLES_USERNAME/PASSWORD ausentes: la búsqueda usa solo la Api-Key)")
+
+    print("\n4) Cuenta de SUBIDA (GUI, XML-RPC)")
+    if not upload:
+        print(
+            "   (configura OPENSUBTITLES_UPLOAD_USERNAME/PASSWORD para probar el login de subida)"
+        )
+    else:
+        try:
+            session = client.login(*upload)
+            results.append(
+                check(
+                    "Login de subida (XML-RPC) OK",
+                    bool(session.token) and session.user.upload_capable,
+                    f"usuario: {session.user.username}",
+                )
+            )
+        except AuthError as exc:
+            results.append(check(f"Login de subida rechazado: {exc}", False))
+        except Exception as exc:  # pragma: no cover
+            results.append(check(f"Login de subida — error inesperado: {exc}", False))
+        finally:
+            with contextlib.suppress(Exception):
+                client.logout()
 
     print()
     failures = sum(1 for ok in results if not ok)

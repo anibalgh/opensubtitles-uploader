@@ -94,3 +94,42 @@ def test_client_upload_requires_login():
             language="eng",
             subtitle_path=Path("x.srt"),
         )
+
+
+def test_gui_login_is_upload_only(monkeypatch):
+    """GUI login must only use XML-RPC; REST/metadata stays untouched."""
+    from opensubtitles_uploader.adapters.osapi.client import OpenSubtitlesClient
+
+    client = OpenSubtitlesClient(api_key=ApiKeySource(None))
+
+    def fake_xml_login(username, password, language="en"):
+        return "xml-token-123"
+
+    def fail_rest(*args, **kwargs):  # pragma: no cover
+        raise AssertionError("REST must not be called by the GUI upload login")
+
+    monkeypatch.setattr(client._xmlrpc, "login", fake_xml_login)
+    monkeypatch.setattr(client, "_rest", fail_rest)
+
+    session = client.login("upload_user", "secret")
+    assert session.token == "xml-token-123"
+    assert session.user.upload_capable is True
+    assert client._xml_token == "xml-token-123"
+    assert client._rest_token is None  # metadata session untouched
+
+
+def test_metadata_session_needs_env_creds_and_key(monkeypatch):
+    """Without API key, ensure_metadata_session must be a safe no-op."""
+    from opensubtitles_uploader.adapters.osapi.client import OpenSubtitlesClient
+
+    client = OpenSubtitlesClient(api_key=ApiKeySource(None))
+    monkeypatch.setenv("OPENSUBTITLES_USERNAME", "someone")
+    monkeypatch.setenv("OPENSUBTITLES_PASSWORD", "secret")
+    monkeypatch.delenv("OPENSUBTITLES_API_KEY", raising=False)  # repo .env may set it
+
+    def fail_rest(*args, **kwargs):  # pragma: no cover
+        raise AssertionError("no REST call without an API key")
+
+    monkeypatch.setattr(client, "_rest", fail_rest)
+    assert client.ensure_metadata_session() is None
+    assert client.metadata_user() is None

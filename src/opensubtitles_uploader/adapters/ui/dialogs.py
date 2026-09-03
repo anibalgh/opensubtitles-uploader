@@ -179,6 +179,26 @@ class SettingsDialog(QDialog):
         key_widget.setLayout(row)
         form.addRow(tr.tr("OpenSubtitles API key"), key_widget)
 
+        from opensubtitles_uploader.config import environment_metadata_credentials
+
+        metadata = environment_metadata_credentials()
+        account_label = QLabel(
+            tr.tr("Metadata/search account")
+            + ": "
+            + (
+                metadata[0]
+                if metadata
+                else tr.tr("not set — catalogue works with the API key alone (.env)")
+            )
+        )
+        account_label.setObjectName("muted")
+        form.addRow(account_label)
+        upload_label = QLabel(
+            tr.tr("Upload account") + ": " + tr.tr("the account you log in with in the main window")
+        )
+        upload_label.setObjectName("muted")
+        form.addRow(upload_label)
+
         tools = tr.tr("Media info tools")
         if has_any_probe():
             tools_label = QLabel(tools + " · ✓ ffprobe/mediainfo")

@@ -124,11 +124,36 @@ class MainWindow(QMainWindow):
         self._apply_settings()
         self._restore_login()
         self._load_languages()
-        self._status_message(
-            "Configure an OpenSubtitles API key (⚙) to enable movie search."
-            if not self.ctx.api_key.resolve()
-            else "Ready."
-        )
+        self._refresh_startup_status()
+
+    def _refresh_startup_status(self) -> None:
+        """Show which credentials the current session will use."""
+        if not self.ctx.api_key.resolve():
+            self._status_message(
+                self.tr.tr("Configure an OpenSubtitles API key (⚙) to enable movie search.")
+            )
+            return
+
+        worker = TaskWorker(lambda: self.ctx.client.ensure_metadata_session())
+        worker.succeeded.connect(self._on_metadata_ready)
+        self._start_worker(worker)
+
+    def _on_metadata_ready(self, user) -> None:
+        if user is not None:
+            self._status_message(
+                self.tr.tr("Search account:")
+                + f" {user.username} — "
+                + self.tr.tr("log in above with your upload account to submit subtitles."),
+                9000,
+            )
+        else:
+            self._status_message(
+                self.tr.tr(
+                    "Search is ready (API key). Log in with your upload account "
+                    "to submit subtitles."
+                ),
+                9000,
+            )
 
     # ------------------------------------------------------------------
     # UI construction

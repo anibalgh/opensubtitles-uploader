@@ -39,6 +39,13 @@ ajeno a la interfaz.
 3. Compruebe los datos, elija el **idioma** del subtítulo si la
    auto-detección falló y pulse **Subir**.
 
+> 🔑 **Dos cuentas distintas, dos cometidos:** la *búsqueda de metadatos*
+> usa la cuenta de opensubtitles.com definida en el entorno (`.env`,
+> `OPENSUBTITLES_USERNAME`/`OPENSUBTITLES_PASSWORD`) y **nunca sube nada**;
+> el *login de la ventana* (arriba a la derecha) usa la cuenta de subida
+> (opensubtitles.org, XML-RPC) y es la única que envía subtítulos.  La barra
+> de estado y los Ajustes muestran qué cuenta se usa para cada cosa.
+
 ## 🧱 Requisitos
 
 - **Python 3.12 o 3.13** (PySide6 todavía no publica wheels para 3.14).
@@ -49,6 +56,11 @@ ajeno a la interfaz.
   <https://www.opensubtitles.com> → *API* → *API keys*, y péguela en
   *Ajustes* de la aplicación (o en la variable de entorno
   `OPENSUBTITLES_API_KEY`).
+- **Cuenta de metadatos (opcional)**: usuario/contraseña de
+  opensubtitles.com en `.env` (`OPENSUBTITLES_USERNAME` /
+  `OPENSUBTITLES_PASSWORD`) — usada solo para búsqueda/identificación.
+- **Cuenta de subida**: la que escriba en el login de la GUI (debe existir
+  en el sistema heredado opensubtitles.org).
 
 ## 🚀 Instalación y ejecución
 
@@ -136,33 +148,42 @@ accesibilidad) y `python-security` (secretos nunca en texto plano, sin
 poetry run pytest                    # tests unitarios + integración
 poetry run ruff check src tests      # linter
 poetry run mypy src                  # chequeo estático estricto
-poetry run bandit -r src             # análisis de seguridad estático
+poetry run bandit -c pyproject.toml -r src  # análisis de seguridad estático
 python scripts/verify_login.py       # verifica el login/APIs en vivo (usa .env)
 ```
 
 Los tests de red reales (marcados `e2e`) están desactivados por defecto:
 `poetry run pytest -m e2e` requiere credenciales/API key reales.  Para
-probar el login contra el servicio real sin tocar los tests, cree un
-archivo `.env` (ignorado por git) con `OPENSUBTITLES_USERNAME`,
-`OPENSUBTITLES_PASSWORD` y `OPENSUBTITLES_API_KEY`, y ejecute
-`python scripts/verify_login.py`.
+probar ambos ámbitos contra el servicio real sin tocar los tests, cree un
+archivo `.env` (ignorado por git) con la clave de API y las credenciales de
+metadatos (`.com`) — y opcionalmente las de subida (`.org`) — y ejecute
+`python scripts/verify_login.py`:
+
+```
+OPENSUBTITLES_API_KEY=tu_api_key_de_opensubtitles.com
+OPENSUBTITLES_USERNAME=usuario_metadatos_com      # catálogo/búsqueda (.com)
+OPENSUBTITLES_PASSWORD=pass_metadatos_com
+OPENSUBTITLES_UPLOAD_USERNAME=usuario_subida_org  # opcional: login de subida
+OPENSUBTITLES_UPLOAD_PASSWORD=pass_subida_org
+```
 
 ## ⚠️ Avisos
 
 - Esta aplicación **no es** OpenSubtitles: usa su API pública y depende de su
   disponibilidad.  Un error `503/506` suele significar mantenimiento o caída
   temporal del servicio.
-- **Cuentas `.com` vs `.org`**: el login y la búsqueda usan la cuenta moderna
-  de opensubtitles.com.  La *subida* sigue exigiendo una cuenta del sistema
-  heredado (`opensubtitles.org`), cuyas bases de datos están separadas: si tu
-  cuenta es solo `.com`, el login funcionará (perfil, búsqueda…) pero la
-  subida avisará de que necesita una cuenta `.org` con las mismas credenciales.
-  Ejecute `python scripts/verify_login.py` para ver en vivo el estado de su
-  cuenta.
+- **Cuentas `.com` vs `.org`**: OpenSubtitles mantiene dos bases de datos.
+  La búsqueda/identificación usa la cuenta moderna `.com` (definida en
+  `.env`) y la subida usa la cuenta `.org` con la que inicias sesión en la
+  GUI.  Si intentas subir sin login de subida, la app avisa de que se
+  necesita esa cuenta (`upload_account_required`).
+  Ejecute `python scripts/verify_login.py` para ver en vivo el estado de cada
+  ámbito.
 - El hash MD5 de subtítulos se usa solo como huella de contenido (requisito
   del servicio); no se emplea para contraseñas.
-- La clave de API y las credenciales se guardan en el almacén de secretos del
-  sistema operativo cuando es posible; nunca en texto plano.
+- La clave de API y las credenciales de subida se guardan en el almacén de
+  secretos del sistema operativo cuando es posible; nunca en texto plano
+  (las credenciales de metadatos viven en `.env`, ignorado por git).
 
 ## 📄 Licencia
 
