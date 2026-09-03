@@ -34,6 +34,7 @@ from opensubtitles_uploader.domain.files import (
 )
 from opensubtitles_uploader.domain.model import (
     Language,
+    MediaKind,
     MovieRef,
     SubtitleFile,
     UploadOutcome,
@@ -41,7 +42,7 @@ from opensubtitles_uploader.domain.model import (
     UserInfo,
     VideoFile,
 )
-from opensubtitles_uploader.domain.naming import clean_movie_name, significant_words
+from opensubtitles_uploader.domain.naming import clean_movie_name, episode_tag, significant_words
 
 _IMDB_ID_RE = re.compile(r"^(?:tt?)?\d{1,9}$", re.IGNORECASE)
 
@@ -56,6 +57,28 @@ def normalize_imdb_id(value: str) -> str:
     if not _IMDB_ID_RE.match(text):
         raise ValidationError("The IMDB id looks invalid.", code="imdb_id_invalid")
     return "tt" + text.lower().lstrip("t")
+
+
+def _pick_movie(results: list[MovieRef], filename: str) -> MovieRef | None:
+    """Choose the best movie reference from search results.
+
+    Prefers an episode whose ``SxxEyy`` matches the file name, then any
+    episode, then a plain movie/show.
+    """
+    if not results:
+        return None
+    tag = episode_tag(filename)
+    if tag:
+        for movie in results:
+            if movie.kind == MediaKind.EPISODE and (movie.season, movie.episode) == tag:
+                return movie
+        for movie in results:
+            if movie.kind == MediaKind.EPISODE:
+                return movie
+    for movie in results:
+        if movie.kind in (MediaKind.MOVIE, MediaKind.SHOW):
+            return movie
+    return results[0]
 
 
 def _ensure_readable_file(path: Path, kind: str | None) -> Path:
@@ -213,7 +236,7 @@ class VideoService:
             if title:
                 try:
                     results = self._catalog.search_features(title)
-                    movie = results[0] if results else None
+                    movie = _pick_movie(results, video.name)
                 except Exception:
                     movie = None
         if movie is None:

@@ -930,7 +930,23 @@ class MainWindow(QMainWindow):
 
     def _on_upload_failed(self, exc: Exception) -> None:
         self._busy_indicator(False)
-        self._status_message(self._friendly_error(exc), 12000)
+        text = self._friendly_error(exc)
+        self._status_message(text, 12000)
+        # A modal makes the upload failure (and its reason) impossible to miss.
+        if isinstance(exc, DomainError):
+            detail = exc.message if hasattr(exc, "message") else None
+            if detail and detail != text:
+                text = f"{text}\n\n{detail}"
+        box = QMessageBox(self)
+        box.setWindowTitle(self.tr.tr("Upload"))
+        box.setIcon(QMessageBox.Critical)
+        box.setText(text)
+        if isinstance(exc, DomainError) and exc.code == "upload_account_required":
+            box.setInformativeText(
+                self.tr.tr("Log in above with your opensubtitles.org account to upload.")
+            )
+        box.addButton(self.tr.tr("OK"), QMessageBox.AcceptRole)
+        box.exec()
 
     # ------------------------------------------------------------------
     # close

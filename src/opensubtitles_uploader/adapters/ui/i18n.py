@@ -15,6 +15,7 @@ _ES: dict[str, str] = {
     # Top bar & login
     "Upload": "Subir",
     "Log in": "Iniciar sesión",
+    "Log in above with your opensubtitles.org account to upload.": "Inicia sesión arriba con tu cuenta de opensubtitles.org para subir.",
     "Log out": "Cerrar sesión",
     "Uploads need a legacy opensubtitles.org account — this opensubtitles.com login works for search but not for uploading.": "La subida requiere una cuenta heredada de opensubtitles.org — este login de opensubtitles.com sirve para buscar, pero no para subir.",
     "Username": "Usuario",

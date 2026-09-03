@@ -574,11 +574,45 @@ class OpenSubtitlesClient:
         subhash: str | None = None,
     ) -> UploadOutcome:
         token = self._require_xml_token()
+
+        # 1) Preliminary TryUploadSubtitles: the server is authoritative —
+        #    it tells us whether the subtitle is already in the database and
+        #    returns the movie ID matching this exact video hash (important
+        #    for TV episodes, where a generic show id would be rejected).
+        probe_cd = self._cd1(
+            moviehash=moviehash,
+            moviebytesize=moviebytesize,
+            subtitle_path=subtitle_path,
+            movie_filename=movie_filename,
+            subhash=subhash,
+            duration_ms=duration_ms,
+            frames=frames,
+            fps=fps,
+            with_content=False,
+        )
+        try_result = self._xmlrpc.try_upload_subtitles(token, probe_cd)
+        try_status = str(try_result.get("status", "") or "")
+        if not try_status.startswith("200"):
+            raise UploadFailedError(
+                try_status or "OpenSubtitles could not check the subtitle.",
+                code="upload_failed",
+            )
+        if try_result.get("alreadyindb") == 1:
+            return UploadOutcome(state="already_exists", existing=self._parse_existing(try_result))
+        data = try_result.get("data") or []
+        if isinstance(data, dict):
+            data = [data]
+        authoritative_imdb = None
+        if data and data[0].get("IDMovieImdb"):
+            authoritative_imdb = str(data[0]["IDMovieImdb"])
+        movie_imdb = authoritative_imdb or imdb_id
+
+        # 2) Real upload.
         baseinfo: dict[str, Any] = {
             "sublanguageid": language,
         }
-        if imdb_id:
-            baseinfo["idmovieimdb"] = str(imdb_id).lower().lstrip("t")
+        if movie_imdb:
+            baseinfo["idmovieimdb"] = str(movie_imdb).lower().lstrip("t")
         if release_name:
             baseinfo["moviereleasename"] = release_name
         if comment:

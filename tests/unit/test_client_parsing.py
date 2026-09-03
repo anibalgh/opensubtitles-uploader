@@ -133,3 +133,65 @@ def test_metadata_session_needs_env_creds_and_key(monkeypatch):
     monkeypatch.setattr(client, "_rest", fail_rest)
     assert client.ensure_metadata_session() is None
     assert client.metadata_user() is None
+
+
+class _FakeXmlRpc:
+    """Records calls; lets tests script try/upload responses."""
+
+    def __init__(self, try_response, upload_response=None):
+        self.try_response = try_response
+        self.upload_response = upload_response
+        self.tried = None
+        self.uploaded = None
+
+    def try_upload_subtitles(self, token, cd1):
+        self.tried = (token, cd1)
+        return self.try_response
+
+    def upload_subtitles(self, token, baseinfo, cd1):
+        self.uploaded = (token, baseinfo, cd1)
+        return self.upload_response
+
+
+def _client_with_session(tmp_path, fake):
+    client = OpenSubtitlesClient(api_key=ApiKeySource(None))
+    client._xml_token = "upload-token"
+    client._xmlrpc = fake  # type: ignore[assignment]
+    sub = Path(tmp_path) / "movie.spa.srt"
+    sub.write_bytes(b"1\n00:00:01,000 --> 00:00:02,000\nHola\n")
+    return client, sub
+
+
+def test_upload_stops_when_already_in_db(tmp_path):
+    fake = _FakeXmlRpc(
+        {
+            "status": "200 OK",
+            "alreadyindb": 1,
+            "data": [{"IDSubtitle": 42, "HashWasAlreadyInDb": 1, "MovieName": "The Terror"}],
+        }
+    )
+    client, sub = _client_with_session(tmp_path, fake)
+    outcome = client.upload(moviehash="ab" * 8, moviebytesize=1, language="spa", subtitle_path=sub)
+    assert outcome.state == "already_exists"
+    assert outcome.existing and outcome.existing[0].subtitle_id == 42
+    assert fake.uploaded is None  # never reached the real upload
+
+
+def test_upload_uses_server_authoritative_imdb(tmp_path):
+    fake = _FakeXmlRpc(
+        {"status": "200 OK", "alreadyindb": 0, "data": [{"IDMovieImdb": "9876543"}]},
+        {"status": "200 OK", "data": "https://www.opensubtitles.org/subtitles/1"},
+    )
+    client, sub = _client_with_session(tmp_path, fake)
+    outcome = client.upload(
+        moviehash="ab" * 8,
+        moviebytesize=1,
+        language="spa",
+        subtitle_path=sub,
+        imdb_id="tt2708480",  # generic (show) id — must be overridden
+    )
+    assert outcome.succeeded and outcome.url
+    _token, baseinfo, cd1 = fake.uploaded
+    assert baseinfo["idmovieimdb"] == "9876543"
+    assert baseinfo["sublanguageid"] == "spa"
+    assert "subcontent" in cd1
