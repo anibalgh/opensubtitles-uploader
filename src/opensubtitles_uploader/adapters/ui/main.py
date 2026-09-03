@@ -63,12 +63,31 @@ def metadata_startup_problem(ctx: AppContext, tr: Translator) -> str | None:
     return None
 
 
+def _quiet_qt_console_noise() -> None:
+    """Disable the *logging categories* behind the cosmetic warnings:
+
+    - ``qt.text.font.db``  → "OpenType support missing for ..."
+    - ``qt.accessibility.atspi`` → "Error in contacting registry ..."
+
+    (The single-family QSS already avoids most font noise, but Qt still
+    probes fallback fonts such as "Noto Sans" internally; these rules are
+    the supported way to silence the rest.)
+    """
+    extra = ("qt.text.*=false", "qt.accessibility.*=false")
+    rules = [rule for rule in os.environ.get("QT_LOGGING_RULES", "").split(";") if rule]
+    for rule in extra:
+        if rule not in rules:
+            rules.append(rule)
+    os.environ["QT_LOGGING_RULES"] = ";".join(rules)
+
+
 def main() -> int:
     from PySide6.QtWidgets import QApplication, QMessageBox
 
     # Quiet down Qt/KDE console noise when no accessibility service or KIO
     # integration is available (the messages are harmless, only cosmetic).
     os.environ.setdefault("QT_LINUX_ACCESSIBILITY_ALWAYS_ON", "0")
+    _quiet_qt_console_noise()
 
     app = QApplication(sys.argv)
     app.setApplicationName("OpenSubtitles Uploader")
