@@ -169,6 +169,12 @@ OPENSUBTITLES_UPLOAD_PASSWORD=pass_subida_org
 
 ## ⚠️ Avisos
 
+- **Arranque con validación**: al abrir la GUI, la aplicación valida la
+  cuenta de metadatos del `.env` (opensubtitles.com) contra la API REST
+  **antes** de mostrar la ventana; si falta o las credenciales son
+  incorrectas, muestra el problema y se cierra.  El login de la ventana
+  valida por separado la cuenta de subida (opensubtitles.org, XML-RPC) e
+  indica un error claro si es incorrecta.
 - Esta aplicación **no es** OpenSubtitles: usa su API pública y depende de su
   disponibilidad.  Un error `503/506` suele significar mantenimiento o caída
   temporal del servicio.

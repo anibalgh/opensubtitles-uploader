@@ -139,6 +139,13 @@ _ES: dict[str, str] = {
     "generic_error": "Algo salió mal :(",
     "ok": "Hecho",
     "cookie_policy": "Al usar la API aceptas la política de OpenSubtitles.",
+    # Startup check (main.py)
+    "Startup check": "Comprobación de inicio",
+    "The application will close.": "La aplicación se cerrará.",
+    "unknown error.": "error desconocido.",
+    "The metadata account is missing: create a .env file with OPENSUBTITLES_USERNAME and OPENSUBTITLES_PASSWORD (opensubtitles.com credentials).": "Falta la cuenta de metadatos: crea un archivo .env con OPENSUBTITLES_USERNAME y OPENSUBTITLES_PASSWORD (credenciales de opensubtitles.com).",
+    "The OpenSubtitles API key is missing: set OPENSUBTITLES_API_KEY (opensubtitles.com) to validate the metadata account.": "Falta la clave de API de OpenSubtitles: define OPENSUBTITLES_API_KEY (opensubtitles.com) para validar la cuenta de metadatos.",
+    "The metadata account could not be validated against opensubtitles.com:": "La cuenta de metadatos no pudo validarse contra opensubtitles.com:",
 }
 
 

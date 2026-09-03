@@ -215,6 +215,7 @@ class OpenSubtitlesClient:
         self._rest_token: str | None = None
         self._rest_user: UserInfo | None = None
         self._metadata_attempted = False
+        self._metadata_error: str | None = None
         self._metadata_lock = threading.Lock()
 
         self._http = httpx.Client(
@@ -325,21 +326,27 @@ class OpenSubtitlesClient:
         Idempotent and thread-safe.  Returns the metadata profile, or
         ``None`` when no credentials/API key are configured or the login
         fails (the catalogue keeps working with the plain ``Api-Key``).
+        When it fails, :attr:`metadata_error` holds the reason.
         """
         creds = environment_metadata_credentials()
         if not creds or not self._api_key.resolve():
             self._metadata_attempted = True
+            self._metadata_error = (
+                "OPENSUBTITLES_USERNAME/PASSWORD or the API key are not configured."
+            )
             return self._rest_user
         with self._metadata_lock:
             if self._metadata_attempted:
                 return self._rest_user
             self._metadata_attempted = True
+            self._metadata_error = None
             username, password = creds
             try:
                 payload = self._rest(
                     "POST", "/login", json_body={"username": username, "password": password}
                 )
-            except ApiError:
+            except ApiError as exc:
+                self._metadata_error = exc.message or str(exc)
                 return None
             token = payload.get("token")
             if token:
@@ -360,6 +367,11 @@ class OpenSubtitlesClient:
     def metadata_user(self) -> UserInfo | None:
         """The current metadata/catalogue profile (without logging in)."""
         return self._rest_user
+
+    @property
+    def metadata_error(self) -> str | None:
+        """Reason of the last failed metadata login (``None`` when ok)."""
+        return self._metadata_error
 
     def whoami(self) -> UserInfo:
         """Prefer the metadata (.env) profile, then the upload (GUI) one."""
@@ -387,6 +399,7 @@ class OpenSubtitlesClient:
         self._rest_token = None
         self._rest_user = None
         self._metadata_attempted = False
+        self._metadata_error = None
 
     # ------------------------------------------------------------------
     # Catalog
