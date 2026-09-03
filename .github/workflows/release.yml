@@ -31,10 +31,10 @@ jobs:
             archive: tar
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -74,7 +74,7 @@ jobs:
           chmod -R a+rX dist-artifact
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: opensubtitles-uploader-${{ matrix.name }}
           path: dist-artifact/*
@@ -90,10 +90,10 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: dist-artifacts
           merge-multiple: true
@@ -102,7 +102,7 @@ jobs:
         run: ls -lhR dist-artifacts
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist-artifacts/*
           generate_release_notes: true
