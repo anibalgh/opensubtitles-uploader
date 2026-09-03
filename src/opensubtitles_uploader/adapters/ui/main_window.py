@@ -460,9 +460,8 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(text, timeout)
 
     def _on_task_error(self, exc: Exception) -> None:
-        code = exc.code if isinstance(exc, DomainError) else "generic_error"
         self._busy_indicator(False)
-        self._status_message(self.tr.tr_code(code, str(exc)))
+        self._status_message(self._friendly_error(exc))
 
     # ------------------------------------------------------------------
     # file input: dialogs + drag&drop
@@ -548,8 +547,7 @@ class MainWindow(QMainWindow):
     def _on_video_failed(self, exc: Exception) -> None:
         self._busy_indicator(False)
         self._video_status.setText("")
-        code = exc.code if isinstance(exc, DomainError) else "generic_error"
-        self._status_message(self.tr.tr_code(code, str(exc)))
+        self._status_message(self._friendly_error(exc))
 
     def _on_video_analysed(self, video: VideoFile, multidrop: bool) -> None:
         self._busy_indicator(False)
@@ -645,8 +643,7 @@ class MainWindow(QMainWindow):
     def _on_subtitle_failed(self, exc: Exception) -> None:
         self._busy_indicator(False)
         self._subtitle_status.setText("")
-        code = exc.code if isinstance(exc, DomainError) else "generic_error"
-        self._status_message(self.tr.tr_code(code, str(exc)))
+        self._status_message(self._friendly_error(exc))
 
     def _on_subtitle_analysed(self, subtitle: SubtitleFile, multidrop: bool) -> None:
         self._busy_indicator(False)
@@ -681,7 +678,7 @@ class MainWindow(QMainWindow):
             return
         worker = TaskWorker(lambda: self.ctx.subtitles.analyze(str(self._subtitle.path)))
         worker.succeeded.connect(lambda sub: self._select_language(sub.language))
-        worker.failed.connect(lambda exc: self._status_message(str(exc)))
+        worker.failed.connect(lambda exc: self._status_message(self._friendly_error(exc)))
         self._start_worker(worker)
 
     def _auto_pair_video(self, subtitle: SubtitleFile) -> None:
@@ -766,7 +763,8 @@ class MainWindow(QMainWindow):
         username = self._login_username.text().strip()
         password = self._login_password.text()
         if not username or not password:
-            self._status_message(self.tr.tr("username_required"))
+            code = "username_required" if not username else "password_required"
+            self._status_message(self.tr.tr_code(code, code))
             return
         self._login_button.setEnabled(False)
         self._login_button.setText("…")
@@ -777,11 +775,21 @@ class MainWindow(QMainWindow):
         worker.failed.connect(self._on_login_failed)
         self._start_worker(worker)
 
+    def _friendly_error(self, exc: Exception) -> str:
+        """A human, translated error message without raw codes/prefixes."""
+        if isinstance(exc, DomainError):
+            code, fallback = exc.code, exc.message
+        else:
+            code, fallback = "generic_error", str(exc)
+        return self.tr.tr_code(code, fallback)
+
     def _on_login_failed(self, exc: Exception) -> None:
         self._login_button.setEnabled(True)
         self._login_button.setText(self.tr.tr("Log in"))
-        code = exc.code if isinstance(exc, DomainError) else "network_error"
-        self._status_message(self.tr.tr_code(code, str(exc)))
+        text = self._friendly_error(exc)
+        self._status_message(text, 12000)
+        # A modal makes a failed login impossible to miss.
+        QMessageBox.warning(self, self.tr.tr("Log in"), text)
 
     def _on_logged_in(self, user) -> None:
         self._login_button.setEnabled(True)
@@ -889,10 +897,7 @@ class MainWindow(QMainWindow):
 
     def _on_upload_failed(self, exc: Exception) -> None:
         self._busy_indicator(False)
-        code = exc.code if isinstance(exc, DomainError) else "upload_failed"
-        self._status_message(self.tr.tr_code(code, str(exc)))
-        if getattr(exc, "message", None):
-            self._status_message(str(exc.message))  # type: ignore[attr-defined]
+        self._status_message(self._friendly_error(exc), 12000)
 
     # ------------------------------------------------------------------
     # close

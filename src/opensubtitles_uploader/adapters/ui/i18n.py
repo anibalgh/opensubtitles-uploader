@@ -111,6 +111,7 @@ _ES: dict[str, str] = {
     "username_required": "Introduce un usuario.",
     "password_required": "Introduce una contraseña.",
     "auth_error": "Usuario o contraseña incorrectos.",
+    "auth_required": "Inicia sesión en OpenSubtitles primero.",
     "upload_account_required": "La subida requiere iniciar sesión con una cuenta heredada de opensubtitles.org.",
     "language_required": "Selecciona el idioma del subtítulo antes de subir.",
     "imdb_id_required": "El video no tiene ID de IMDB. Se recomienda identificarlo para clasificar bien el subtítulo.",
@@ -119,11 +120,46 @@ _ES: dict[str, str] = {
     "upload_failed": "No se pudo subir el subtítulo.",
     "service_unavailable": "OpenSubtitles no está disponible ahora. Inténtalo más tarde.",
     "network_error": "No se pudo conectar con OpenSubtitles.",
+    "api_key_required": "Configura una clave de API de OpenSubtitles en Ajustes (⚙) para usar esta función.",
     "api_error": "OpenSubtitles devolvió un error.",
+    "rate_limited": "Demasiadas peticiones a OpenSubtitles. Espera un momento y reintenta.",
+    "forbidden": "OpenSubtitles rechazó la petición (revisa tu clave/API o cuenta).",
+    "not_found": "No encontrado.",
+    "invalid_input": "OpenSubtitles rechazó los datos enviados.",
     "already_exists": "El subtítulo ya existe.",
     "generic_error": "Algo salió mal :(",
     "ok": "Hecho",
     "cookie_policy": "Al usar la API aceptas la política de OpenSubtitles.",
+}
+
+
+# Error codes -> human messages (English reference).
+_EN_CODES: dict[str, str] = {
+    "auth_error": "Wrong username or password.",
+    "auth_required": "Log in to OpenSubtitles first.",
+    "upload_account_required": (
+        "Uploading needs a legacy opensubtitles.org account — this "
+        "opensubtitles.com login works for search but not for uploading."
+    ),
+    "api_key_required": "Set an OpenSubtitles API key in Settings (⚙) to use this feature.",
+    "api_error": "OpenSubtitles returned an error.",
+    "network_error": "Cannot reach OpenSubtitles. Check your connection and try again.",
+    "rate_limited": "Too many requests to OpenSubtitles. Wait a moment and retry.",
+    "service_unavailable": "OpenSubtitles is temporarily unavailable. Try again later.",
+    "forbidden": "OpenSubtitles refused the request (check your API key / account).",
+    "not_found": "Not found.",
+    "invalid_input": "OpenSubtitles rejected the request data.",
+    "upload_failed": "The subtitle could not be uploaded.",
+    "username_required": "Enter your username.",
+    "password_required": "Enter your password.",
+    "language_required": "Choose the subtitle language before uploading.",
+    "file_not_supported": "This file type is not supported.",
+    "file_not_found": "The file was not found.",
+    "file_too_small": "The file is too small to compute a movie hash.",
+    "imdb_id_required": "The video has no IMDB id. Identify the movie to classify the subtitle correctly.",
+    "imdb_id_invalid": "The IMDB id is not valid.",
+    "search_query_required": "Type a title to search.",
+    "generic_error": "Something went wrong.",
 }
 
 
@@ -139,7 +175,12 @@ class Translator:
         return text
 
     def tr_code(self, code: str, fallback: str | None = None) -> str:
-        translated = self.tr(code)
-        if translated != code:
-            return translated
+        if self.locale == "es":
+            translated = _ES.get(code)
+            if translated:
+                return translated
+        else:
+            translated = _EN_CODES.get(code)
+            if translated:
+                return translated
         return fallback or code
