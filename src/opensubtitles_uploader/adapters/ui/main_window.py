@@ -7,6 +7,7 @@ and the one-click upload — mirroring the original NW.js application.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Qt, QUrl, Signal
@@ -48,8 +49,9 @@ from opensubtitles_uploader.adapters.ui.dialogs import (
 from opensubtitles_uploader.adapters.ui.i18n import Translator
 from opensubtitles_uploader.adapters.ui.icons import app_icon, app_pixmap
 from opensubtitles_uploader.adapters.ui.workers import TaskWorker
+from opensubtitles_uploader.application.services import build_upload_request, normalize_imdb_id
 from opensubtitles_uploader.bootstrap import AppContext
-from opensubtitles_uploader.domain.errors import DomainError
+from opensubtitles_uploader.domain.errors import DomainError, ValidationError
 from opensubtitles_uploader.domain.files import (
     SUBTITLE_DIALOG_PATTERN,
     VIDEO_DIALOG_PATTERN,
@@ -870,6 +872,25 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     # upload
     # ------------------------------------------------------------------
+    def _typed_imdb_id(self) -> str | None:
+        """Manually typed IMDB id, normalized to ``tt...`` (or ``None``).
+
+        Raises :class:`ValidationError` when the field is non-empty but invalid.
+        """
+        text = self.imdb_field.text().strip()
+        if not text:
+            return None
+        return normalize_imdb_id(text)
+
+    @staticmethod
+    def _apply_imdb(video: VideoFile, imdb_id: str) -> VideoFile:
+        movie = video.movie
+        if movie is None:
+            movie = MovieRef(imdb_id=imdb_id, title="")
+        else:
+            movie = replace(movie, imdb_id=imdb_id)
+        return replace(video, movie=movie)
+
     def _verify_and_upload(self) -> None:
         if self._busy:
             return
@@ -879,8 +900,14 @@ class MainWindow(QMainWindow):
         if self._video is None:
             self._status_message(self.tr.tr("Drop a video file or select one"))
             return
-        movie = self._video.movie
-        if movie is None:
+        try:
+            typed = self._typed_imdb_id()
+        except ValidationError:
+            text = self.tr.tr_code("imdb_id_invalid", self.tr.tr("IMDB id"))
+            self._status_message(text, 8000)
+            QMessageBox.warning(self, self.tr.tr("Upload"), text)
+            return
+        if typed is None and self._video.movie is None:
             box = QMessageBox(self)
             box.setWindowTitle(self.tr.tr("Upload"))
             box.setText(self.tr.tr_code("imdb_id_required", self.tr.tr("Upload")))
@@ -893,19 +920,21 @@ class MainWindow(QMainWindow):
                 return
             if box.clickedButton() is not upload_now:
                 return
-        self._run_upload()
+        self._run_upload(typed)
 
-    def _run_upload(self) -> None:
+    def _run_upload(self, typed_imdb: str | None = None) -> None:
         language: Language | None = self.sub_language.currentData()
         if language is None:
             self._status_message(self.tr.tr("language_required"))
             return
         if self._video is None or self._subtitle is None:
             return
-        from opensubtitles_uploader.application.services import build_upload_request
+        video = self._video
+        if typed_imdb and (video.movie is None or video.movie.imdb_id != typed_imdb):
+            video = self._apply_imdb(video, typed_imdb)
 
         request = build_upload_request(
-            self._video,
+            video,
             self._subtitle,
             language=language,
             movie_aka=self.video_aka.text(),

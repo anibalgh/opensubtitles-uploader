@@ -143,9 +143,9 @@ def _as_int(value: Any) -> int | None:
 
 
 def _normalize_imdb(value: Any) -> str:
-    """``1375666``/``"1375666"`` -> ``"tt1375666"``."""
+    """``1375666``/``"1375666"`` -> ``"tt1375666"`` (zero-padded to 7 digits)."""
     try:
-        return f"tt{int(value)}"
+        return f"tt{int(value):07d}"
     except (TypeError, ValueError):
         return str(value).lower()
 

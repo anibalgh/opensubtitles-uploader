@@ -24,6 +24,13 @@ def test_normalize_imdb():
     assert _normalize_imdb("1375666") == "tt1375666"
 
 
+def test_normalize_imdb_zero_pads():
+    # tt0294448 (Chôjin Locke, 1983): the REST API returns the bare number.
+    assert _normalize_imdb(294448) == "tt0294448"
+    assert _normalize_imdb("294448") == "tt0294448"
+    assert _normalize_imdb("tt0294448") == "tt0294448"
+
+
 def test_kind_from():
     assert _kind_from("Movie") == MediaKind.MOVIE
     assert _kind_from("Episode") == MediaKind.EPISODE

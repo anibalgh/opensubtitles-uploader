@@ -10,8 +10,9 @@ from rich.console import Console
 from rich.table import Table
 
 from opensubtitles_uploader import __version__
-from opensubtitles_uploader.bootstrap import bootstrap
-from opensubtitles_uploader.domain.errors import DomainError
+from opensubtitles_uploader.bootstrap import AppContext, bootstrap
+from opensubtitles_uploader.config import environment_upload_credentials
+from opensubtitles_uploader.domain.errors import AuthError, DomainError
 
 app = typer.Typer(
     name="opensubtitles-uploader",
@@ -47,6 +48,28 @@ _context = bootstrap
 def _err(message: str) -> None:
     console.print(f"[red]✗ {message}[/red]")
     raise typer.Exit(code=1)
+
+
+def _ensure_upload_session(ctx: AppContext) -> None:
+    """Log the upload (.org) account in non-interactively, when possible.
+
+    Tries, in order: the ``.env`` upload credentials
+    (``OPENSUBTITLES_UPLOAD_USERNAME`` / ``OPENSUBTITLES_UPLOAD_PASSWORD``),
+    then a previously remembered (keychain) session.  Raises ``AuthError``
+    when neither is available.
+    """
+    creds = environment_upload_credentials()
+    if creds:
+        ctx.client.login(*creds)
+        return
+    if ctx.auth.restore() is not None:
+        return
+    raise AuthError(
+        "Log in with an opensubtitles.org (legacy) account to upload. "
+        "Run 'opensubtitles-uploader login' or set OPENSUBTITLES_UPLOAD_USERNAME "
+        "and OPENSUBTITLES_UPLOAD_PASSWORD in the .env file.",
+        code="upload_account_required",
+    )
 
 
 @app.command()
@@ -193,6 +216,7 @@ def upload(
         console.print("[yellow]No movie identified; continuing without an IMDB id.[/yellow]")
     else:
         console.print(f"[cyan]Identified: {movie.display_title()} ({movie.imdb_id})[/cyan]")
+    _ensure_upload_session(ctx)
     outcome = ctx.uploads.upload(request)
     if outcome.succeeded:
         console.print(f"[green]✓ {outcome.url or 'Uploaded'}[/green]")

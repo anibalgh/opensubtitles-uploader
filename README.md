@@ -40,11 +40,11 @@ separación:
 | Ámbito | Cuenta | Servicio | Desde dónde |
 |---|---|---|---|
 | 🔍 **Metadatos / catálogo** (búsqueda, identificación, perfil) | opensubtitles.com | REST `api.opensubtitles.com` | `.env`: `OPENSUBTITLES_USERNAME` / `OPENSUBTITLES_PASSWORD` (+ `OPENSUBTITLES_API_KEY`) |
-| ⬆️ **Subida de subtítulos** | opensubtitles.org (legacy) | XML-RPC `api.opensubtitles.org/xml-rpc` | Login de la **ventana** (GUI) o `login` en CLI |
+| ⬆️ **Subida de subtítulos** | opensubtitles.org (legacy) | XML-RPC `api.opensubtitles.org/xml-rpc` | GUI (login) · CLI (`login` o `OPENSUBTITLES_UPLOAD_*` en `.env`) |
 
 - La cuenta del `.env` **nunca sube** (`upload_capable=False`).
-- El login de la ventana **solo** valida la cuenta de subida `.org` y es el
-  único que habilita `UploadSubtitles`.
+- El login de subida `.org` (GUI o CLI) es el único que habilita
+  `UploadSubtitles`.
 - La barra de estado y los Ajustes muestran qué cuenta se usa en cada ámbito;
   si se intenta subir sin sesión `.org`, la app abre un diálogo explicándolo.
 
@@ -94,13 +94,14 @@ las variables de entorno reales tienen prioridad):
 OPENSUBTITLES_API_KEY=tu_api_key_de_opensubtitles.com
 OPENSUBTITLES_USERNAME=usuario_metadatos_com      # catálogo/búsqueda (.com)
 OPENSUBTITLES_PASSWORD=pass_metadatos_com
-OPENSUBTITLES_UPLOAD_USERNAME=usuario_subida_org  # opcional: login de subida
-OPENSUBTITLES_UPLOAD_PASSWORD=pass_subida_org     # (scripts de verificación)
+OPENSUBTITLES_UPLOAD_USERNAME=usuario_subida_org  # opcional: subida no interactiva
+OPENSUBTITLES_UPLOAD_PASSWORD=pass_subida_org     # (CLI upload / verificación)
 ```
 
 > La API key y las credenciales de metadatos también pueden ir como
 > variables de entorno reales.  Las credenciales de **subida** se escriben en
-> el login de la GUI (opción *Recordar* guarda en el keychain).
+> el login de la GUI (opción *Recordar* guarda en el keychain); la CLI
+> `upload` las toma de `OPENSUBTITLES_UPLOAD_*` en el `.env` (o del keychain).
 
 ### Interfaz gráfica
 
@@ -124,6 +125,10 @@ poetry run opensubtitles-uploader upload video.mkv sub.eng.srt --language en
 ```
 
 Comandos: `login`, `logout`, `whoami`, `analyze`, `search`, `upload`.
+
+El comando `upload` inicia sesión de subida automáticamente si encuentra
+`OPENSUBTITLES_UPLOAD_USERNAME`/`OPENSUBTITLES_UPLOAD_PASSWORD` en el `.env`
+(o una sesión guardada en el keychain); si no, pide `login` primero.
 
 ## 🏛️ Arquitectura (hexagonal)
 
@@ -266,8 +271,8 @@ cada uno con la GUI (`OpenSubtitlesUploader`) y la CLI
 (`opensubtitles-uploader-cli`).
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0     # dispara el workflow y crea la Release
+git tag v1.0.1
+git push origin v1.0.1     # dispara el workflow y crea la Release
 ```
 
 También puede ejecutarse manualmente desde *Actions → Release binaries →
@@ -305,7 +310,7 @@ Secrets del repositorio (*Settings → Secrets and variables → Actions*):
 ## 🧪 Desarrollo y calidad
 
 ```bash
-poetry run pytest                                   # 56 tests unitarios
+poetry run pytest                                   # 60 tests unitarios
 poetry run ruff check src tests scripts             # linter
 poetry run mypy src                                 # chequeo estático estricto
 poetry run bandit -c pyproject.toml -r src          # análisis de seguridad

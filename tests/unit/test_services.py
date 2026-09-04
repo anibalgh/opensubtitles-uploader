@@ -177,6 +177,7 @@ def _make_subtitle(**overrides) -> SubtitleFile:
 def test_normalize_imdb_id():
     assert normalize_imdb_id("1375666") == "tt1375666"
     assert normalize_imdb_id("tt1375666") == "tt1375666"
+    assert normalize_imdb_id("0294448") == "tt0294448"
     assert normalize_imdb_id("https://www.imdb.com/title/tt1375666/") == "tt1375666"
     with pytest.raises(ValidationError):
         normalize_imdb_id("")  # type: ignore[arg-type]
