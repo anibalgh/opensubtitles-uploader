@@ -52,6 +52,25 @@ separación:
 
 - **Python 3.12 o 3.13** (PySide6 todavía no publica wheels para 3.14).
 - [Poetry](https://python-poetry.org) ≥ 2.0.
+- *(Linux — requerido)* **`libxcb-cursor0`**: Qt 6.5+ no carga el backend
+  X11 sin esta librería. En Debian/Ubuntu/Zorin:
+
+  ```bash
+  sudo apt-get update
+  sudo apt-get install -y libxcb-cursor0
+  ```
+
+  Solo en entornos mínimos sin escritorio (servidor/CI) instala además el
+  resto de librerías X11 que usa Qt:
+
+  ```bash
+  sudo apt-get install -y libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+      libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-shm0 \
+      libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 \
+      libgl1 libegl1
+  ```
+
+  En Wayland, si el arranque falla, fuerza X11 con `QT_QPA_PLATFORM=xcb`.
 - *(Opcional, recomendado)* `mediainfo` o `ffprobe` en el `PATH` para la
   ficha técnica del video.
 - Una **API key gratuita** de opensubtitles.com: <https://www.opensubtitles.com>
@@ -167,8 +186,8 @@ Prerrequisitos comunes:
 git clone git@github.com:anibalgh/opensubtitles-uploader.git
 cd opensubtitles-uploader
 poetry install -E build
-poetry run python scripts/build_app.py gui      # → dist\OpenSubtitlesUploader\ (GUI)
-poetry run python scripts/build_app.py cli      # (opcional) → dist\opensubtitles-uploader-cli\ (CLI)
+poetry run python scripts/build_app.py gui      # → dist\OpenSubtitlesUploader.exe (GUI)
+poetry run python scripts/build_app.py cli      # (opcional) → dist\opensubtitles-uploader-cli.exe (CLI)
 ```
 
 - Icono `.ico` incrustado en el ejecutable.
@@ -186,6 +205,10 @@ poetry run python scripts/build_app.py cli      # (opcional) → dist/opensubtit
 ```
 
 - Icono `.icns` incrustado en la app bundle.
+- *(macOS, onefile)* además del `.app` también se genera el ejecutable único
+  `dist/OpenSubtitlesUploader`; distribuye el `.app` (doble clic, icono en el
+  Dock).  Un bundle *onefile* no puede notarizarse con *sandbox* (solo firma
+  normal).
 - *(Opcional)* `brew install ffmpeg` o `brew install mediainfo`.
 - Para distribuir fuera de tu equipo: firme y notarice la app
   (`codesign` + `notarytool`), o el usuario final deberá hacer clic derecho →
@@ -197,8 +220,8 @@ poetry run python scripts/build_app.py cli      # (opcional) → dist/opensubtit
 git clone git@github.com:anibalgh/opensubtitles-uploader.git
 cd opensubtitles-uploader
 poetry install -E build
-poetry run python scripts/build_app.py gui      # → dist/OpenSubtitlesUploader/ (GUI)
-poetry run python scripts/build_app.py cli      # (opcional) → dist/opensubtitles-uploader-cli/ (CLI)
+poetry run python scripts/build_app.py gui      # → dist/OpenSubtitlesUploader (GUI)
+poetry run python scripts/build_app.py cli      # (opcional) → dist/opensubtitles-uploader-cli (CLI)
 ```
 
 - Icono `.png` referenciado; los recursos (iconos + lista de idiomas) quedan
@@ -218,11 +241,16 @@ poetry run python scripts/build_app.py cli      # (opcional) → dist/opensubtit
 - Entradas PyInstaller: `scripts/launch_gui.py` (GUI, sin consola) y
   `scripts/launch_cli.py` (CLI, con consola); ambos llaman al `main()` del
   paquete.
-- Resultado en `dist/` (formato *onedir*):
-  - GUI: `dist/OpenSubtitlesUploader/` (el ejecutable está dentro,
-    `OpenSubtitlesUploader.exe` en Windows, `…app` en macOS);
-  - CLI: `dist/opensubtitles-uploader-cli/`.
+- Resultado en `dist/` (formato *onefile* — un único ejecutable autocontenido):
+  - GUI: `OpenSubtitlesUploader.exe` (Windows), `OpenSubtitlesUploader.app`
+    (macOS) o `OpenSubtitlesUploader` (Linux);
+  - CLI: `opensubtitles-uploader-cli.exe` (Windows) /
+    `opensubtitles-uploader-cli` (macOS/Linux).
   Los artefactos intermedios quedan en `build/` (ignorados por git).
+- El ejecutable *onefile* se autoextrae a un directorio temporal en cada
+  arranque (por eso el primer arranque puede tardar un poco más); los datos
+  (`os_languages.json` + iconos) viajan dentro del ejecutable y se leen desde
+  esa carpeta temporal automáticamente.
 - Para instaladores finales (NSIS/MSI, DMG, .deb/AppImage) puede envolver el
   binario generado con la herramienta que prefiera; el icono oficial ya está
   incluido.
@@ -238,13 +266,41 @@ cada uno con la GUI (`OpenSubtitlesUploader`) y la CLI
 (`opensubtitles-uploader-cli`).
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0     # dispara el workflow y crea la Release
+git tag v1.0.0
+git push origin v1.0.0     # dispara el workflow y crea la Release
 ```
 
 También puede ejecutarse manualmente desde *Actions → Release binaries →
-Run workflow*.  Nota: los binarios no están firmados (macOS pedirá *Abrir*
-la primera vez; Windows mostrará el aviso de SmartScreen).
+Run workflow*.
+
+Antes de publicar, el workflow ejecuta un *smoke test* del binario CLI en cada
+plataforma (`opensubtitles-uploader-cli --version` y `--help`) para confirmar
+que el binario arranca correctamente.
+
+#### Firma y notarización (opcional)
+
+Si configuras los secrets correspondientes, el workflow firma los `.exe` de
+Windows (`signtool`), firma la app de macOS (`codesign`) y la **notariza +
+grapa** (`notarytool` + `stapler`). Si algún secret no existe, ese paso se
+omite y se publican binarios **sin firmar** (macOS pedirá *Abrir* la primera
+vez; Windows mostrará el aviso de SmartScreen).
+
+Secrets del repositorio (*Settings → Secrets and variables → Actions*):
+
+| Secret | Uso |
+|---|---|
+| `WINDOWS_CERT_BASE64` | Windows: certificado `.pfx` codificado en base64 |
+| `WINDOWS_CERT_PASSWORD` | Windows: contraseña del `.pfx` |
+| `APPLE_SIGNING_CERT_BASE64` | macOS: certificado `.p12` (*Developer ID Application*) en base64 |
+| `APPLE_SIGNING_CERT_PASSWORD` | macOS: contraseña del `.p12` |
+| `APPLE_SIGNING_IDENTITY` | macOS: `"Developer ID Application: Nombre (TEAMID)"` |
+| `APPLE_TEAM_ID` | macOS: Team ID de Apple (10 caracteres) |
+| `APPLE_ID` | macOS: correo de la cuenta Apple Developer |
+| `APPLE_APP_SPECIFIC_PASSWORD` | macOS: contraseña de app (appleid.apple.com → *Sign-In & Security*) |
+
+> Nota macOS: un bundle *onefile* se firma con *hardened runtime* y se notariza
+> sin *sandbox* (el sandbox no es compatible con onefile); para la Mac App
+> Store necesitarías compilar en modo *onedir* con sandbox.
 
 ## 🧪 Desarrollo y calidad
 

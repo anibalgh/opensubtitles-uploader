@@ -9,6 +9,23 @@ on:
 permissions:
   contents: write
 
+# ----------------------------------------------------------------------
+# Firma y notarización (opcional — se activa solo si existen los secrets).
+#
+# Windows (firma de código con un certificado .pfx):
+#   WINDOWS_CERT_BASE64     -> certificado .pfx en base64
+#   WINDOWS_CERT_PASSWORD   -> contraseña del .pfx
+#
+# macOS (firma Developer ID + notarización con notarytool):
+#   APPLE_SIGNING_CERT_BASE64   -> certificado .p12 (Developer ID Application) en base64
+#   APPLE_SIGNING_CERT_PASSWORD -> contraseña del .p12
+#   APPLE_SIGNING_IDENTITY      -> "Developer ID Application: Nombre (TEAMID)"
+#   APPLE_TEAM_ID               -> Team ID de Apple (10 caracteres)
+#   APPLE_ID                    -> correo de la cuenta Apple Developer
+#   APPLE_APP_SPECIFIC_PASSWORD -> contraseña de app (appleid.apple.com → Sign-In & Security)
+#
+# Si alguno falta, ese paso se omite y se publican binarios SIN firmar.
+# ----------------------------------------------------------------------
 jobs:
   # ------------------------------------------------------------------
   # 1) Build the GUI binary on every operating system
@@ -29,6 +46,15 @@ jobs:
           - os: ubuntu-latest
             name: linux
             archive: tar
+    env:
+      WINDOWS_CERT_BASE64: ${{ secrets.WINDOWS_CERT_BASE64 }}
+      WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+      APPLE_SIGNING_CERT_BASE64: ${{ secrets.APPLE_SIGNING_CERT_BASE64 }}
+      APPLE_SIGNING_CERT_PASSWORD: ${{ secrets.APPLE_SIGNING_CERT_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -50,12 +76,83 @@ jobs:
       - name: Build CLI binary with PyInstaller
         run: poetry run python scripts/build_app.py cli
 
+      - name: Smoke test CLI binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $exe = "dist\opensubtitles-uploader-cli.exe"
+          & $exe --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $exe --help | Out-Null
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Host "Smoke test OK (Windows)"
+
+      - name: Smoke test CLI binary (macOS/Linux)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dist/opensubtitles-uploader-cli --version
+          dist/opensubtitles-uploader-cli --help > /dev/null
+          echo "Smoke test OK"
+
+      - name: Sign Windows binaries (signtool)
+        if: runner.os == 'Windows' && env.WINDOWS_CERT_BASE64 != ''
+        shell: pwsh
+        run: |
+          $cert = Join-Path $env:RUNNER_TEMP "codesign.pfx"
+          [IO.File]::WriteAllBytes($cert, [Convert]::FromBase64String($env:WINDOWS_CERT_BASE64))
+          signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 `
+            /f $cert /p $env:WINDOWS_CERT_PASSWORD "dist\OpenSubtitlesUploader.exe"
+          signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 `
+            /f $cert /p $env:WINDOWS_CERT_PASSWORD "dist\opensubtitles-uploader-cli.exe"
+
+      - name: Sign macOS binaries (codesign)
+        if: runner.os == 'macOS' && env.APPLE_SIGNING_CERT_BASE64 != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          CERT_PATH="$RUNNER_TEMP/signing.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PASSWORD="opensubtitles-temp-keychain"
+
+          echo -n "$APPLE_SIGNING_CERT_BASE64" | base64 -D > "$CERT_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$APPLE_SIGNING_CERT_PASSWORD" -A \
+            -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          codesign --force --options runtime --sign "$APPLE_SIGNING_IDENTITY" \
+            dist/OpenSubtitlesUploader.app
+          codesign --force --sign "$APPLE_SIGNING_IDENTITY" dist/opensubtitles-uploader-cli
+          codesign --verify --verbose=2 dist/OpenSubtitlesUploader.app
+
+      - name: Notarize and staple macOS app
+        if: runner.os == 'macOS' && env.APPLE_SIGNING_CERT_BASE64 != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          ditto -c -k --keepParent dist/OpenSubtitlesUploader.app \
+            "$RUNNER_TEMP/OpenSubtitlesUploader-notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/OpenSubtitlesUploader-notarize.zip" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple dist/OpenSubtitlesUploader.app
+          xcrun stapler validate dist/OpenSubtitlesUploader.app
+
       - name: Prepare artifact (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist-artifact | Out-Null
-          Compress-Archive -Path "dist\OpenSubtitlesUploader","dist\opensubtitles-uploader-cli" -DestinationPath "dist-artifact\OpenSubtitlesUploader-windows.zip"
+          Compress-Archive -Path "dist\OpenSubtitlesUploader.exe","dist\opensubtitles-uploader-cli.exe" -DestinationPath "dist-artifact\OpenSubtitlesUploader-windows.zip"
 
       - name: Prepare artifact (macOS)
         if: runner.os == 'macOS'
@@ -114,14 +211,14 @@ jobs:
             **CLI** (`opensubtitles-uploader-cli`):
 
             - **Windows** → `OpenSubtitlesUploader-windows.zip`
-              - GUI: `OpenSubtitlesUploader\OpenSubtitlesUploader.exe`
-              - CLI: `opensubtitles-uploader-cli\opensubtitles-uploader-cli.exe`
+              - GUI: `OpenSubtitlesUploader.exe`
+              - CLI: `opensubtitles-uploader-cli.exe`
             - **macOS** → `OpenSubtitlesUploader-macos.zip`
               - GUI: `OpenSubtitlesUploader.app`
-              - CLI: `opensubtitles-uploader-cli/opensubtitles-uploader-cli`
+              - CLI: `opensubtitles-uploader-cli`
             - **Linux** → `OpenSubtitlesUploader-linux.tar.gz`
-              - GUI: `OpenSubtitlesUploader/OpenSubtitlesUploader`
-              - CLI: `opensubtitles-uploader-cli/opensubtitles-uploader-cli`
+              - GUI: `OpenSubtitlesUploader`
+              - CLI: `opensubtitles-uploader-cli`
 
             Ejemplo CLI:
 
@@ -143,6 +240,7 @@ jobs:
             El **login de subida** (cuenta opensubtitles.org) se escribe dentro de la app
             (o con `opensubtitles-uploader-cli login`).
 
-            > Los binarios **no están firmados**: en macOS usa clic derecho → *Abrir* la
-            > primera vez; en Windows puede aparecer el aviso de SmartScreen
+            > Si los secrets de firma están configurados, los binarios se publican
+            > firmados/notarizados. En caso contrario: en macOS usa clic derecho →
+            > *Abrir* la primera vez; en Windows puede aparecer el aviso de SmartScreen
             > (Más información → Ejecutar de todas formas).

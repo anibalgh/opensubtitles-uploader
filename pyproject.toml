@@ -1,6 +1,6 @@
 [project]
 name = "opensubtitles-uploader"
-version = "0.1.0"
+version = "1.0.0"
 description = "Multiplataforma (Windows/macOS/Linux) para analizar un video local y subir sus subtítulos a OpenSubtitles — reimplementación en Python del clásico OpenSubtitles Uploader, con arquitectura hexagonal."
 readme = "README.md"
 license = { text = "MIT" }

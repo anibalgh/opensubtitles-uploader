@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from opensubtitles_uploader import __version__
 from opensubtitles_uploader.adapters.media.probe import has_any_probe
 from opensubtitles_uploader.adapters.osapi.keys import ApiKeySource
 from opensubtitles_uploader.adapters.ui.i18n import LOCALES, Translator
@@ -214,7 +215,7 @@ class SettingsDialog(QDialog):
         tools_label.setObjectName("muted")
         form.addRow(tools_label)
 
-        about = QLabel(f"OpenSubtitles Uploader · {tr.tr('developed by')} Anibal · v0.1.0")
+        about = QLabel(f"OpenSubtitles Uploader · {tr.tr('developed by')} Anibal · v{__version__}")
         about.setObjectName("muted")
         form.addRow(about)
 

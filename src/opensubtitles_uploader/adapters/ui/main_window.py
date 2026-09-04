@@ -37,6 +37,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from opensubtitles_uploader import __version__
 from opensubtitles_uploader.adapters.media.dataset import bundled_languages
 from opensubtitles_uploader.adapters.ui.dialogs import (
     SearchDialog,
@@ -186,7 +187,7 @@ class MainWindow(QMainWindow):
         title_box = QVBoxLayout()
         title = QLabel("OpenSubtitles Uploader")
         title.setObjectName("panelTitle")
-        version = QLabel("v0.1.0 · OpenSubtitles")
+        version = QLabel(f"v{__version__} · OpenSubtitles")
         version.setObjectName("muted")
         title_box.addWidget(title)
         title_box.addWidget(version)

@@ -22,6 +22,7 @@ from typing import Any
 
 import httpx
 
+from opensubtitles_uploader import __version__
 from opensubtitles_uploader.adapters.media.dataset import bundled_language_index
 from opensubtitles_uploader.adapters.osapi.keys import ApiKeySource
 from opensubtitles_uploader.adapters.osapi.xmlrpc import XmlRpcClient
@@ -46,7 +47,7 @@ from opensubtitles_uploader.domain.model import (
     UserInfo,
 )
 
-USER_AGENT = "OpenSubtitles-Uploader v0.1.0"
+USER_AGENT = f"OpenSubtitles-Uploader v{__version__}"
 
 _XMLRPC_ENDPOINT = "https://api.opensubtitles.org/xml-rpc"
 

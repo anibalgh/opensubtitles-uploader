@@ -26,6 +26,7 @@ import time
 
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[1] / "src"))
 
+from opensubtitles_uploader import __version__
 from opensubtitles_uploader.adapters.osapi.client import OpenSubtitlesClient
 from opensubtitles_uploader.adapters.osapi.keys import ApiKeySource
 from opensubtitles_uploader.config import (
@@ -47,7 +48,7 @@ def main() -> int:
     upload = environment_upload_credentials()
 
     client = OpenSubtitlesClient(
-        api_key=ApiKeySource(None), user_agent="OpenSubtitles-Uploader v0.1.0 (verify)"
+        api_key=ApiKeySource(None), user_agent=f"OpenSubtitles-Uploader v{__version__} (verify)"
     )
     results: list[bool] = []
 

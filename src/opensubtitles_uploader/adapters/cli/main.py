@@ -9,6 +9,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from opensubtitles_uploader import __version__
 from opensubtitles_uploader.bootstrap import bootstrap
 from opensubtitles_uploader.domain.errors import DomainError
 
@@ -18,6 +19,27 @@ app = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
 )
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"OpenSubtitles Uploader {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def _main_callback(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        help="Show the application version and exit.",
+        callback=_version_callback,
+        is_eager=True,
+    ),
+) -> None:
+    """OpenSubtitles Uploader CLI (root options)."""
+
+
 console = Console()
 _context = bootstrap
 

@@ -8,7 +8,7 @@ and with the Poetry environment (which installs PyInstaller):
     poetry run python scripts/build_app.py gui     # "OpenSubtitlesUploader" (windowed)
     poetry run python scripts/build_app.py cli     # "opensubtitles-uploader-cli" (console)
 
-Output: ``dist/``.
+Output: ``dist/`` (formato *onefile*: un único ejecutable autocontenido).
 """
 
 from __future__ import annotations
@@ -52,6 +52,7 @@ def _build(windowed: bool) -> int:
         "PyInstaller",
         "--noconfirm",
         "--clean",
+        "--onefile",
         "--name",
         name,
         "--paths",
@@ -67,6 +68,10 @@ def _build(windowed: bool) -> int:
     ]
     if windowed:
         cmd.append("--windowed")
+        if sys.platform == "darwin":
+            # Identificador estable del bundle .app (requerido para firmar y
+            # para que keyring asocie el acceso al Keychain con esta app).
+            cmd += ["--osx-bundle-identifier", "com.anibalgh.opensubtitles-uploader"]
     icon = _icon()
     if icon and sys.platform != "linux":
         cmd += ["--icon", icon]
