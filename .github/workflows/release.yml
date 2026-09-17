@@ -201,9 +201,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          files: dist-artifacts/*
+          tag_name: ${{ github.ref_name }}
           generate_release_notes: true
-          fail_on_unmatched_files: true
           body: |
             ## OpenSubtitles Uploader — binarios por plataforma
 
@@ -244,3 +243,24 @@ jobs:
             > firmados/notarizados. En caso contrario: en macOS usa clic derecho →
             > *Abrir* la primera vez; en Windows puede aparecer el aviso de SmartScreen
             > (Más información → Ejecutar de todas formas).
+
+      - name: Upload Linux release asset
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: dist-artifacts/OpenSubtitlesUploader-linux.tar.gz
+          fail_on_unmatched_files: true
+
+      - name: Upload macOS release asset
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: dist-artifacts/OpenSubtitlesUploader-macos.zip
+          fail_on_unmatched_files: true
+
+      - name: Upload Windows release asset
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: dist-artifacts/OpenSubtitlesUploader-windows.zip
+          fail_on_unmatched_files: true
