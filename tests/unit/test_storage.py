@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from cryptography.fernet import Fernet
+
 from opensubtitles_uploader.adapters.osapi.keys import ApiKeySource
 from opensubtitles_uploader.adapters.storage.secret_store import (
     FernetSecretStore,
@@ -65,3 +67,19 @@ def test_api_key_source_env_wins(monkeypatch, tmp_path):
     assert source.resolve() == "vault-key"
     source.store("")
     assert source.resolve() is None
+
+
+# Fernet vector produced by cryptography 45.0.7 — the version pinned before
+# the security bump to 50.x.  A vault written by an older release must keep
+# decrypting after the upgrade, so this fixed pair guards the wire format.
+_LEGACY_FERNET_KEY = "OOB2TlcSHElGOBbqQlQcIcLDsTer1pl8x4NHj4w9nSA="
+_LEGACY_FERNET_TOKEN = (
+    "gAAAAABqrDBjYjPjjEJPAF-MJILVEEDc75SaCpYxn5df4zsAHjel-2GWXSdiP3h469cCXqLlXT5"
+    "ObE2v4JwCpqDLOhj5jWGnfLfZyY_0rN_HusgPCJnoLN4="
+)
+
+
+def test_fernet_decrypts_legacy_vault():
+    """Backward compatibility: tokens from cryptography 45.x decrypt on 50.x."""
+    plain = Fernet(_LEGACY_FERNET_KEY.encode()).decrypt(_LEGACY_FERNET_TOKEN.encode())
+    assert plain == b"legacy-vault-payload"

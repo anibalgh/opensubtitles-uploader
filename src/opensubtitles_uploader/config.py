@@ -1,6 +1,7 @@
 """Environment and user-data paths (12-factor friendly).
 
-Only module allowed to read the environment eagerly.  Secrets are read
+Only module allowed to read the environment.  Values are resolved lazily
+so a local ``.env`` loaded at import time is honoured.  Secrets are read
 lazily by the dedicated :class:`~.adapters.storage.secret_store` backend.
 
 Two credential scopes are deliberately separated:
@@ -38,11 +39,11 @@ METADATA_PASSWORD_ENV = "OPENSUBTITLES_PASSWORD"
 UPLOAD_USERNAME_ENV = "OPENSUBTITLES_UPLOAD_USERNAME"
 UPLOAD_PASSWORD_ENV = "OPENSUBTITLES_UPLOAD_PASSWORD"
 
-#: OpenSubtitles REST endpoint.
-OS_BASE_URL = os.environ.get("OPENSUBTITLES_BASE_URL", "https://api.opensubtitles.com/api/v1")
+#: OpenSubtitles REST endpoint used when the environment does not set one.
+_DEFAULT_BASE_URL = "https://api.opensubtitles.com/api/v1"
 
-#: Request timeouts (seconds).
-HTTP_TIMEOUT = float(os.environ.get("OPENSUBTITLES_HTTP_TIMEOUT", "30"))
+#: Default request timeout (seconds) when the environment does not set one.
+_DEFAULT_HTTP_TIMEOUT = 30.0
 
 #: Repo root (one level above the ``src`` package) — dev-only .env location.
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -106,6 +107,32 @@ def user_data_path() -> Path:
 def _env(name: str) -> str | None:
     value = os.environ.get(name)
     return value.strip() if value and value.strip() else None
+
+
+def api_base_url() -> str:
+    """OpenSubtitles REST endpoint (``OPENSUBTITLES_BASE_URL``).
+
+    Resolved lazily on every call, so a value loaded from a local ``.env``
+    by :func:`load_dotenv` — or exported after this module was imported —
+    is always honoured.
+    """
+    return _env("OPENSUBTITLES_BASE_URL") or _DEFAULT_BASE_URL
+
+
+def http_timeout() -> float:
+    """Request timeout in seconds (``OPENSUBTITLES_HTTP_TIMEOUT``).
+
+    Falls back to :data:`_DEFAULT_HTTP_TIMEOUT` when the variable is
+    unset, non-numeric or not strictly positive.
+    """
+    raw = _env("OPENSUBTITLES_HTTP_TIMEOUT")
+    if raw is None:
+        return _DEFAULT_HTTP_TIMEOUT
+    try:
+        value = float(raw)
+    except ValueError:
+        return _DEFAULT_HTTP_TIMEOUT
+    return value if value > 0 else _DEFAULT_HTTP_TIMEOUT
 
 
 def environment_api_key() -> str | None:

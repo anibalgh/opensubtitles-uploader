@@ -310,7 +310,7 @@ Secrets del repositorio (*Settings → Secrets and variables → Actions*):
 ## 🧪 Desarrollo y calidad
 
 ```bash
-poetry run pytest                                   # 60 tests unitarios
+poetry run pytest                                   # 69 tests unitarios
 poetry run ruff check src tests scripts             # linter
 poetry run mypy src                                 # chequeo estático estricto
 poetry run bandit -c pyproject.toml -r src          # análisis de seguridad
@@ -325,6 +325,44 @@ poetry run python scripts/verify_login.py
 
 Los tests `e2e` (red real) están desactivados por defecto:
 `poetry run pytest -m e2e`.
+
+### Integración continua
+
+`.github/workflows/ci.yml` ejecuta en cada *push* a `master`/`main` y en cada
+*pull request* los mismos gates que arriba, en **Python 3.12 y 3.13**: `ruff
+check`, `ruff format --check`, `mypy` estricto, `bandit` y `pytest` con
+cobertura. Un job aparte audita las dependencias instaladas con `pip-audit`
+(`cryptography` ≥ 50 y `pytest` ≥ 9 incluidos) y también es bloqueante.
+
+### Política de dependencias y «techos»
+
+Todos los rangos de `pyproject.toml` llevan techo (`<X`). Un techo demasiado
+bajo puede **bloquear los parches de seguridad** en lugar de proteger: es
+justo lo que pasaba con `cryptography`, fijado en `<46.0.0` mientras los
+*fixes* de sus avisos estaban en 46.0.5–50.0.0.
+
+> **📌 Recordatorio — revisar al retomar el proyecto.**
+> Contrasta los techos con PyPI y con `pip-audit` antes de dar por buena la
+> configuración. Si un aviso se arregla **por encima** del techo, sube el
+> techo, regenera el lock y vuelve a auditar. Presta atención especial a:
+>
+> | Paquete | Techo actual | Por qué vigilarlo |
+> |---|---|---|
+> | `cryptography` | `>=50.0.0,<51.0.0` | cifra los secretos; su techo `<46` ya bloqueó fixes una vez |
+> | `pytest` | `>=9.0.3,<10.0.0` | dev-only, pero `pip-audit` también lo audita |
+> | `pytest-cov` | `>=7.0.0,<8.0.0` | acoplado a la versión de `pytest` |
+
+Comprobación rápida:
+
+```bash
+poetry run pip index versions cryptography     # última publicada en PyPI
+poetry run pip install --quiet pip-audit
+poetry run pip-audit                           # debe decir "No known vulnerabilities found"
+```
+
+Si al subir `cryptography` un vault Fernet antiguo dejara de descifrarse, el
+test `tests/unit/test_storage.py::test_fernet_decrypts_legacy_vault` (vector
+fijo generado con 45.0.7) lo detecta.
 
 ## ⚠️ Avisos
 

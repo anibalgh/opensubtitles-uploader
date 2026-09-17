@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: ["master", "main"]
+  pull_request:
+  workflow_dispatch: {}
+
+# CI only needs to read the repository.
+permissions:
+  contents: read
+
+# A new push supersedes an in-flight run on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ------------------------------------------------------------------
+  # Lint, formatting, types, security scan and tests on every Python
+  # version the project supports (pyproject requires >=3.12,<3.14).
+  # These gates are blocking: a red run must be fixed before merge.
+  # ------------------------------------------------------------------
+  quality:
+    name: Quality (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        run: python -m pip install --upgrade "poetry>=2.0,<3"
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Lint (ruff)
+        run: poetry run ruff check src tests scripts
+
+      - name: Format check (ruff)
+        run: poetry run ruff format --check src tests scripts
+
+      - name: Type check (mypy, strict)
+        run: poetry run mypy src
+
+      - name: Security scan (bandit)
+        run: poetry run bandit -c pyproject.toml -r src
+
+      - name: Tests (pytest)
+        # The e2e marker is deselected by addopts, so no network is used.
+        # Coverage has no threshold yet: the Qt UI layer is not exercised.
+        run: poetry run pytest --cov --cov-report=term-missing
+
+  # ------------------------------------------------------------------
+  # Known vulnerabilities in the dependency set installed from
+  # poetry.lock.  Blocking: a vulnerability introduced by a dependency
+  # bump (or a newly disclosed one) must be triaged before merge.
+  #
+  # `pip` is upgraded first because pip-audit audits the whole venv,
+  # including its own tooling.  pip-audit itself is pinned so the gate
+  # stays reproducible.
+  # ------------------------------------------------------------------
+  audit:
+    name: Dependency audit (pip-audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: python -m pip install --upgrade "poetry>=2.0,<3"
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Audit installed dependencies
+        run: |
+          poetry run pip install --quiet --upgrade pip
+          poetry run pip install --quiet "pip-audit==2.10.1"
+          poetry run pip-audit --progress-spinner off

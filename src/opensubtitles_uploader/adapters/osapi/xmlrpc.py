@@ -19,6 +19,7 @@ from typing import Any
 
 import httpx
 
+from opensubtitles_uploader.config import http_timeout
 from opensubtitles_uploader.domain.errors import ApiError, AuthError, UploadFailedError
 
 
@@ -176,12 +177,12 @@ class XmlRpcClient:
         self,
         base_url: str = "https://api.opensubtitles.org/xml-rpc",
         user_agent: str = "OpenSubtitles-Uploader",
-        timeout: float = 30.0,
+        timeout: float | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._user_agent = user_agent
         self._http = httpx.Client(
-            timeout=httpx.Timeout(timeout),
+            timeout=httpx.Timeout(http_timeout() if timeout is None else timeout),
             follow_redirects=True,
             headers={"User-Agent": self._user_agent},
         )

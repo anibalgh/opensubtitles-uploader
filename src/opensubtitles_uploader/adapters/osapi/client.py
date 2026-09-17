@@ -27,9 +27,9 @@ from opensubtitles_uploader.adapters.media.dataset import bundled_language_index
 from opensubtitles_uploader.adapters.osapi.keys import ApiKeySource
 from opensubtitles_uploader.adapters.osapi.xmlrpc import XmlRpcClient
 from opensubtitles_uploader.config import (
-    HTTP_TIMEOUT,
-    OS_BASE_URL,
+    api_base_url,
     environment_metadata_credentials,
+    http_timeout,
 )
 from opensubtitles_uploader.domain.errors import (
     ApiError,
@@ -111,7 +111,7 @@ class _LanguageCatalogue:
         # 2) REST /infos/languages (2-letter codes) as a fallback.
         try:
             response = self._http.get(
-                f"{self._base_url}/infos/languages", headers=self._headers, timeout=HTTP_TIMEOUT
+                f"{self._base_url}/infos/languages", headers=self._headers, timeout=http_timeout()
             )
             if response.status_code == 200:
                 payload = response.json()
@@ -198,14 +198,15 @@ class OpenSubtitlesClient:
         self,
         *,
         api_key: ApiKeySource,
-        rest_base_url: str = OS_BASE_URL,
+        rest_base_url: str | None = None,
         user_agent: str = USER_AGENT,
-        timeout: float = HTTP_TIMEOUT,
+        timeout: float | None = None,
         xmlrpc_endpoint: str = _XMLRPC_ENDPOINT,
     ) -> None:
         self._api_key = api_key
         self._user_agent = user_agent
-        self._rest_base = rest_base_url.rstrip("/")
+        self._rest_base = (rest_base_url or api_base_url()).rstrip("/")
+        resolved_timeout = http_timeout() if timeout is None else timeout
 
         # --- upload session (GUI login -> legacy XML-RPC endpoint) -------
         self._xml_token: str | None = None
@@ -219,11 +220,11 @@ class OpenSubtitlesClient:
         self._metadata_lock = threading.Lock()
 
         self._http = httpx.Client(
-            timeout=httpx.Timeout(timeout),
+            timeout=httpx.Timeout(resolved_timeout),
             follow_redirects=True,
             headers={"User-Agent": user_agent, "Accept": "application/json"},
         )
-        self._xmlrpc = XmlRpcClient(xmlrpc_endpoint, user_agent, timeout)
+        self._xmlrpc = XmlRpcClient(xmlrpc_endpoint, user_agent, resolved_timeout)
         self._catalogue = _LanguageCatalogue(
             self._xmlrpc, self._http, self._rest_base, self._headers()
         )
