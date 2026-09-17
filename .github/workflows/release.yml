@@ -203,6 +203,9 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           generate_release_notes: true
+          # Notas curadas por versión (docs/releases/vX.Y.Z.md). Si el fichero
+          # no existe para un tag, se usa el `body` genérico de abajo.
+          body_path: docs/releases/${{ github.ref_name }}.md
           body: |
             ## OpenSubtitles Uploader — binarios por plataforma
 

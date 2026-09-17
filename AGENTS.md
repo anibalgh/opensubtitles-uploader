@@ -29,6 +29,17 @@ Python 3.12/3.13, gestionado con **Poetry ≥ 2**.
 | Metadatos / catálogo | REST `api.opensubtitles.com` | `.env`: `OPENSUBTITLES_USERNAME/PASSWORD` + `API_KEY` | **No** |
 | Subida | XML-RPC `api.opensubtitles.org` | Login GUI/CLI (`opensubtitles.org`) | **Sí** |
 
+## Identificación de título e IMDB id
+
+`VideoService.identify(video, *, title=None, imdb_id=None)` resuelve en cascada:
+hash → IMDB explícito → IMDB del **nombre del archivo** → IMDB del nombre de la
+**carpeta contenedora** → búsqueda por título (explícito, del archivo o de la
+carpeta).  Si el catálogo falla, conserva un `MovieRef` mínimo con el id.
+
+Las funciones puras viven en `domain/naming.py` (`extract_imdb_id`,
+`release_title`) y aceptan tanto nombres de archivo como de carpeta.  En la CLI
+se fuerzan con `--title` y `--imdb-id` (comandos `upload` y `analyze`).
+
 ## Comandos
 
 ```bash
@@ -85,3 +96,6 @@ poetry run bandit -c pyproject.toml -r src
 - Los tests `e2e` tocan la red y están deseleccionados por defecto.
 - `poetry` puede necesitar caché escribible fuera de `$HOME` en entornos
   restringidos: `POETRY_CACHE_DIR` / `POETRY_DATA_DIR`.
+- Variables opcionales del entorno/`.env`: `OPENSUBTITLES_BASE_URL` (endpoint
+  REST alternativo) y `OPENSUBTITLES_HTTP_TIMEOUT` (segundos); se resuelven de
+  forma perezosa con `config.api_base_url()` / `config.http_timeout()`.

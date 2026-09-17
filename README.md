@@ -96,12 +96,17 @@ OPENSUBTITLES_USERNAME=usuario_metadatos_com      # catálogo/búsqueda (.com)
 OPENSUBTITLES_PASSWORD=pass_metadatos_com
 OPENSUBTITLES_UPLOAD_USERNAME=usuario_subida_org  # opcional: subida no interactiva
 OPENSUBTITLES_UPLOAD_PASSWORD=pass_subida_org     # (CLI upload / verificación)
+OPENSUBTITLES_BASE_URL=https://api.opensubtitles.com/api/v1  # opcional: endpoint REST
+OPENSUBTITLES_HTTP_TIMEOUT=30                     # opcional: timeout HTTP (segundos)
 ```
 
 > La API key y las credenciales de metadatos también pueden ir como
 > variables de entorno reales.  Las credenciales de **subida** se escriben en
 > el login de la GUI (opción *Recordar* guarda en el keychain); la CLI
 > `upload` las toma de `OPENSUBTITLES_UPLOAD_*` en el `.env` (o del keychain).
+> `OPENSUBTITLES_BASE_URL` y `OPENSUBTITLES_HTTP_TIMEOUT` son opcionales y se
+> resuelven de forma perezosa al construir el cliente, por lo que valen tanto
+> en el `.env` como en el entorno real.
 
 ### Interfaz gráfica
 
@@ -119,7 +124,8 @@ revise la ficha (use la lupa 🔎 si no se identificó) → inicie sesión con s
 ```bash
 poetry run opensubtitles-uploader --help
 poetry run opensubtitles-uploader login --username TU_USUARIO_ORG
-poetry run opensubtitles-uploader analyze video.mkv sub.eng.srt
+poetry run opensubtitles-uploader analyze video.mkv      # video: hash, fps, duración, IMDB
+poetry run opensubtitles-uploader analyze sub.eng.srt    # subtítulo: MD5, idioma, flags
 poetry run opensubtitles-uploader search "The Terror"
 poetry run opensubtitles-uploader upload video.mkv sub.eng.srt --language en
 # Forzar título e IMDB id en vez de deducirlos del archivo/carpeta:
@@ -297,15 +303,32 @@ y Linux** (matriz de runners con PyInstaller) y se publica una **GitHub
 Release** con los tres artefactos (`OpenSubtitlesUploader-windows.zip`,
 `OpenSubtitlesUploader-macos.zip`, `OpenSubtitlesUploader-linux.tar.gz`),
 cada uno con la GUI (`OpenSubtitlesUploader`) y la CLI
-(`opensubtitles-uploader-cli`).
+(`opensubtitles-uploader-cli`).  Los tres assets se suben en **pasos
+secuenciales** (Linux → macOS → Windows) fijando `tag_name`, para que no
+compitan entre sí.
+
+La versión se toma de `pyproject.toml` / `__init__.py`, así que súbela y
+commitéala **antes** de etiquetar.  El repositorio usa **tags anotados** cuyo
+mensaje es el detalle del release (así están `v1.0.0` y `v1.0.1`):
 
 ```bash
-git tag v1.0.1
-git push origin v1.0.1     # dispara el workflow y crea la Release
+VERSION=$(poetry version -s)        # la versión de pyproject.toml
+git tag -a "v$VERSION" -F -         # el mensaje (por stdin) es el detalle del release
+git push origin "v$VERSION"         # dispara el workflow y crea la Release
 ```
+
+Las notas que se ven en la Release salen de **`docs/releases/vX.Y.Z.md`**: el
+workflow las lee con `body_path` y las antepone al changelog que autogenera
+GitHub.  Si el fichero no existe para un tag, cae al texto genérico de
+binarios.  Añade ese fichero en el mismo commit que la subida de versión.
 
 También puede ejecutarse manualmente desde *Actions → Release binaries →
 Run workflow*.
+
+> **Cuerpo del release.** Las notas curadas van primero y, debajo,
+> `generate_release_notes: true` añade el changelog automático de GitHub.  La
+> anotación del tag es solo historial local; para retocar un release ya
+> publicado: `gh release edit v1.0.3 --notes-file docs/releases/v1.0.3.md`.
 
 Antes de publicar, el workflow ejecuta un *smoke test* del binario CLI en cada
 plataforma (`opensubtitles-uploader-cli --version` y `--help`) para confirmar

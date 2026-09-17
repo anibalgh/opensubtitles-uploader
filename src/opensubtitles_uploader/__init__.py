@@ -16,7 +16,7 @@ The package follows a hexagonal (ports & adapters) layout:
 
 from __future__ import annotations
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 
 APP_NAME = "OpenSubtitles Uploader"
 APP_ID = "opensubtitles-uploader"
