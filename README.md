@@ -22,7 +22,7 @@ testeable y reutilizable desde la GUI **o** desde la línea de comandos.
 | 🔐 **Arranque con validación** | Al abrir la GUI se valida la **cuenta de metadatos** (`.env`, opensubtitles.com) contra la API REST; si falta o es incorrecta, muestra el problema en un diálogo y **cierra la app**. |
 | 👤 **Login de subida (ventana)** | Valida la cuenta de **opensubtitles.org** (XML-RPC) con diálogo de error claro si es incorrecta. **Recordar** guarda las credenciales en el *keychain* del SO (o cifradas con Fernet como respaldo). |
 | 🎬 **Carga de video** | Arrastrar y soltar o examinar; calcula el *moviehash* de OpenSubtitles leyendo solo los primeros/últimos 64 KiB (instantáneo incluso con videos de varios GB). |
-| 🧠 **Identificación automática** | Por *moviehash* vía REST; si no hay coincidencia, por nombre de archivo y búsqueda en el catálogo; **prefiere el episodio cuyo `SxxEyy` coincide** con el nombre del archivo. Rellena IMDB id y carátula. |
+| 🧠 **Identificación automática** | Por *moviehash* vía REST; si no hay coincidencia, por el **IMDB id** del nombre del archivo o de su carpeta contenedora, y por búsqueda del título (archivo o carpeta); **prefiere el episodio cuyo `SxxEyy` coincide** con el nombre del archivo. Título e IMDB id se pueden forzar con `--title`/`--imdb-id`. Rellena IMDB id y carátula. |
 | 📊 **Metadatos técnicos** | vía `mediainfo` o `ffprobe` (opcional): fps, duración (ms), fotogramas, resolución y alta definición. Si no hay binarios, la app funciona sin esa ficha. |
 | 💬 **Carga de subtítulos** | MD5, auto-detección de idioma (contenido + nombre de archivo, offline y sin dependencias), detección de *hearing impaired*, *machine translated* y *foreign parts only*. |
 | 🔎 **Búsqueda** | Busca películas/series/episodios y asigna el IMDB id sin salir de la app. |
@@ -122,6 +122,8 @@ poetry run opensubtitles-uploader login --username TU_USUARIO_ORG
 poetry run opensubtitles-uploader analyze video.mkv sub.eng.srt
 poetry run opensubtitles-uploader search "The Terror"
 poetry run opensubtitles-uploader upload video.mkv sub.eng.srt --language en
+# Forzar título e IMDB id en vez de deducirlos del archivo/carpeta:
+poetry run opensubtitles-uploader upload video.mkv sub.eng.srt --imdb-id tt42969298
 ```
 
 Comandos: `login`, `logout`, `whoami`, `analyze`, `search`, `upload`.
@@ -130,6 +132,33 @@ El comando `upload` inicia sesión de subida automáticamente si encuentra
 `OPENSUBTITLES_UPLOAD_USERNAME`/`OPENSUBTITLES_UPLOAD_PASSWORD` en el `.env`
 (o una sesión guardada en el keychain); si no, pide `login` primero.
 
+#### Título e IMDB id automáticos
+
+`upload` y `analyze` deducen el **título/estreno** y el **IMDB id** sin
+intervención:
+
+1. **Título** — del nombre del archivo de video (se descartan calidad, códec,
+   fuente, año entre paréntesis y `SxxEyy`/`1x02`); si no queda nada útil, del
+   nombre del **directorio** que lo contiene.
+2. **IMDB id** — primero del nombre del archivo; si no aparece ahí, del nombre
+   del **directorio** contenedor.  Entiende `[imdbid-tt42969298]`,
+   `{imdb-tt42969298}`, `imdbid=tt…` y `tt…` suelto.
+3. Cuando hay IMDB id se piden sus metadatos al catálogo; si la red falla, se
+   continúa igualmente con el id.
+
+Ambos valores se pueden forzar por parámetro y entonces **mandan** sobre lo
+deducido: `--title "KAMUI, tras de ti"` y `--imdb-id tt42969298`.
+
+En estos ejemplos el id sale del **directorio** en los dos primeros y del
+**archivo** en los otros dos:
+
+```
+.../Ushiro.no.Shoumen.Kamui-san.{tvdb-473913}.[imdbid-tt42969298]/KAMUI.Hes.Behind.You.s01e09.mkv
+.../Ushiro.no.Shoumen.Kamui-san.{tvdb-473913}.[imdbid-tt42969298]/KAMUI.Hes.Behind.You.1x09.mkv
+.../Captain.America.Saga/Captain.America.(1979).{tvdb-27158}.[imdbid-tt0078937].mp4
+.../Captain.America.Saga/Captain.America.The.Winter.Soldier.(2014).{tvdb-965}.[imdbid-tt1843866].4k.mkv
+```
+
 ## 🏛️ Arquitectura (hexagonal)
 
 ```
@@ -137,7 +166,7 @@ src/opensubtitles_uploader/
 ├── domain/          # reglas puras: sin frameworks ni I/O
 │   ├── model.py     # VideoFile, SubtitleFile, MovieRef, MediaInfo, Session…
 │   ├── files.py     # extensiones y heurísticas de subtítulos (flags)
-│   ├── naming.py    # limpieza de títulos y detección SxxEyy
+│   ├── naming.py    # limpieza de títulos, SxxEyy e IMDB id
 │   ├── pairing.py   # emparejamiento video ⇄ subtítulo
 │   └── errors.py    # errores tipados (AuthError, ApiError, UploadFailedError…)
 ├── application/     # casos de uso + puertos (typing.Protocol)
@@ -310,7 +339,7 @@ Secrets del repositorio (*Settings → Secrets and variables → Actions*):
 ## 🧪 Desarrollo y calidad
 
 ```bash
-poetry run pytest                                   # 69 tests unitarios
+poetry run pytest                                   # 78 tests unitarios
 poetry run ruff check src tests scripts             # linter
 poetry run mypy src                                 # chequeo estático estricto
 poetry run bandit -c pyproject.toml -r src          # análisis de seguridad

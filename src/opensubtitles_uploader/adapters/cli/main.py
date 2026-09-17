@@ -105,6 +105,16 @@ def whoami() -> None:
 @app.command()
 def analyze(
     file: Path = typer.Argument(..., exists=True, help="Video or subtitle file"),
+    title: str | None = typer.Option(
+        None,
+        "--title",
+        help="Título/estreno a usar (por defecto: nombre del video o de su carpeta).",
+    ),
+    imdb_id: str | None = typer.Option(
+        None,
+        "--imdb-id",
+        help="IMDB id a usar (por defecto: del nombre del video o de su carpeta).",
+    ),
 ) -> None:
     """Analyse a video (hash + media info + movie id) or a subtitle."""
     ctx = _context()
@@ -113,7 +123,7 @@ def analyze(
     kind = classify_file(file)
     if kind == "video":
         video = ctx.videos.analyze(file)
-        identified = ctx.videos.identify(video)
+        identified = ctx.videos.identify(video, title=title, imdb_id=imdb_id)
         movie = identified.movie
         table = Table(title=f"Video — {identified.name}")
         table.add_column("Property")
@@ -181,6 +191,16 @@ def upload(
     language: str = typer.Option(
         None, help="Subtitle language (ISO code, e.g. en/es/fr) — auto-detected when omitted"
     ),
+    title: str | None = typer.Option(
+        None,
+        "--title",
+        help="Título/estreno a usar (por defecto: nombre del video o de su carpeta).",
+    ),
+    imdb_id: str | None = typer.Option(
+        None,
+        "--imdb-id",
+        help="IMDB id a usar (por defecto: del nombre del video o de su carpeta).",
+    ),
     release_name: str | None = typer.Option(None, help="Release name"),
     translator: str | None = typer.Option(None, help="Translator"),
     comment: str | None = typer.Option(None, help="Comment for the subtitle"),
@@ -189,7 +209,7 @@ def upload(
     ctx = _context()
 
     analysed_video = ctx.videos.analyze(video)
-    analysed_video = ctx.videos.identify(analysed_video)
+    analysed_video = ctx.videos.identify(analysed_video, title=title, imdb_id=imdb_id)
     sub = ctx.subtitles.analyze(subtitle)
 
     selected_language = sub.language

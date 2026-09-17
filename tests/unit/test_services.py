@@ -15,7 +15,7 @@ from opensubtitles_uploader.application.services import (
     build_upload_request,
     normalize_imdb_id,
 )
-from opensubtitles_uploader.domain.errors import FileNotSupportedError, ValidationError
+from opensubtitles_uploader.domain.errors import ApiError, FileNotSupportedError, ValidationError
 from opensubtitles_uploader.domain.model import (
     Language,
     MediaInfo,
@@ -53,6 +53,9 @@ class FakeCatalog:
         self.identified: MovieRef | None = None
         self.guesses: MovieRef | None = None
         self.searches: list[MovieRef] = []
+        self.details: dict[str, MovieRef] = {}
+        self.search_queries: list[str] = []
+        self.detail_queries: list[str] = []
 
     def identify(self, moviehash: str, moviebytesize: int) -> MovieRef | None:
         return self.identified
@@ -61,9 +64,13 @@ class FakeCatalog:
         return self.guesses
 
     def search_features(self, query: str) -> list[MovieRef]:
+        self.search_queries.append(query)
         return self.searches
 
     def feature_details(self, imdb_id: str) -> MovieRef | None:
+        self.detail_queries.append(imdb_id)
+        if imdb_id in self.details:
+            return self.details[imdb_id]
         return self.movie if imdb_id == self.movie.imdb_id else None
 
 
@@ -142,6 +149,13 @@ class FakeUploader:
 
 def _video_path(tmp_path: Path) -> Path:
     video = tmp_path / "Inception.2010.1080p.mkv"
+    video.write_bytes(b"\x00" * 1024)
+    return video
+
+
+def _video_in(folder: Path, filename: str) -> Path:
+    folder.mkdir(parents=True, exist_ok=True)
+    video = folder / filename
     video.write_bytes(b"\x00" * 1024)
     return video
 
@@ -241,6 +255,80 @@ def test_video_identify_falls_back_to_search(tmp_path):
     assert video.movie is None
     identified = service.identify(video)
     assert identified.movie is not None and identified.movie.imdb_id == "tt1375666"
+
+
+def test_video_identify_reads_imdb_from_parent_folder(tmp_path):
+    path = _video_in(
+        tmp_path / "Ushiro.no.Shoumen.Kamui-san.{tvdb-473913}.[imdbid-tt42969298]",
+        "KAMUI.Hes.Behind.You.s01e09.mkv",
+    )
+    catalog = FakeCatalog()
+    catalog.details["tt42969298"] = MovieRef(
+        imdb_id="tt42969298", title="Kamui", kind=MediaKind.EPISODE, season=1, episode=9
+    )
+    service = VideoService(FakeHasher(), FakeProbe(), catalog)
+    video = service.analyze(path)  # hash lookup finds nothing
+    assert video.movie is None
+    identified = service.identify(video)
+    assert identified.movie is not None
+    assert identified.movie.imdb_id == "tt42969298"
+    assert catalog.detail_queries == ["tt42969298"]
+
+
+def test_video_identify_prefers_imdb_in_file_name_over_folder(tmp_path):
+    path = _video_in(
+        tmp_path / "[imdbid-tt1111111]",
+        "Movie.(2014).{tvdb-965}.[imdbid-tt1843866].mkv",
+    )
+    catalog = FakeCatalog()
+    catalog.details["tt1843866"] = MovieRef(imdb_id="tt1843866", title="From file")
+    catalog.details["tt1111111"] = MovieRef(imdb_id="tt1111111", title="From folder")
+    service = VideoService(FakeHasher(), FakeProbe(), catalog)
+    identified = service.identify(service.analyze(path))
+    assert identified.movie is not None
+    assert identified.movie.imdb_id == "tt1843866"
+
+
+def test_video_identify_explicit_imdb_wins(tmp_path):
+    path = _video_in(tmp_path / "[imdbid-tt42969298]", "KAMUI.Hes.Behind.You.s01e09.mkv")
+    catalog = FakeCatalog()
+    service = VideoService(FakeHasher(), FakeProbe(), catalog)
+    identified = service.identify(service.analyze(path), imdb_id="tt1375666")
+    assert identified.movie is not None and identified.movie.imdb_id == "tt1375666"
+    assert catalog.detail_queries == ["tt1375666"]
+
+
+def test_video_identify_keeps_imdb_when_api_fails(tmp_path):
+    class BrokenCatalog(FakeCatalog):
+        def feature_details(self, imdb_id: str) -> MovieRef | None:
+            raise ApiError("offline", code="network_error")
+
+    path = _video_in(tmp_path, "KAMUI.Hes.Behind.You.s01e09.mkv")
+    service = VideoService(FakeHasher(), FakeProbe(), BrokenCatalog())
+    identified = service.identify(service.analyze(path), imdb_id="tt42969298")
+    assert identified.movie is not None
+    assert identified.movie.imdb_id == "tt42969298"
+    # A minimal reference still carries the title derived from the file name.
+    assert identified.movie.title == "KAMUI Hes Behind You"
+
+
+def test_video_identify_uses_explicit_title_for_search(tmp_path):
+    path = _video_path(tmp_path)
+    catalog = FakeCatalog()
+    catalog.guesses = MovieRef(imdb_id="tt9999999", title="Wrong guess")
+    catalog.searches = [MovieRef(imdb_id="tt1375666", title="Inception")]
+    service = VideoService(FakeHasher(), FakeProbe(), catalog)
+    identified = service.identify(service.analyze(path), title="Explicit Title")
+    assert identified.movie is not None and identified.movie.imdb_id == "tt1375666"
+    # An explicit title skips the filename guess and is searched as given.
+    assert catalog.search_queries == ["Explicit Title"]
+
+
+def test_video_identify_rejects_invalid_imdb(tmp_path):
+    service = VideoService(FakeHasher(), FakeProbe(), FakeCatalog())
+    video = service.analyze(_video_path(tmp_path))
+    with pytest.raises(ValidationError):
+        service.identify(video, imdb_id="not-an-id")
 
 
 def test_subtitle_analyze_detects_flags(tmp_path):

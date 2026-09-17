@@ -8,7 +8,13 @@ from opensubtitles_uploader.domain.files import (
     has_machine_translation_markers,
     likely_hearing_impaired,
 )
-from opensubtitles_uploader.domain.naming import clean_movie_name, episode_tag, significant_words
+from opensubtitles_uploader.domain.naming import (
+    clean_movie_name,
+    episode_tag,
+    extract_imdb_id,
+    release_title,
+    significant_words,
+)
 from opensubtitles_uploader.domain.pairing import subtitle_matches_video
 
 
@@ -57,6 +63,40 @@ def test_significant_words():
     assert "the" not in words
     assert "1999" not in words
     assert "beyond" in words
+
+
+def test_extract_imdb_id():
+    # id inside a folder name, with the usual bracket/brace spellings
+    assert (
+        extract_imdb_id("Ushiro.no.Shoumen.Kamui-san.{tvdb-473913}.[imdbid-tt42969298]")
+        == "tt42969298"
+    )
+    assert (
+        extract_imdb_id("Captain.America.(1979).{tvdb-27158}.[imdbid-tt0078937].mp4") == "tt0078937"
+    )
+    assert extract_imdb_id("Movie [imdb-tt1843866] 2160p.mkv") == "tt1843866"
+    assert extract_imdb_id("Movie imdbid=tt1234567.mkv") == "tt1234567"
+    assert extract_imdb_id("Movie.tt1234567.1080p.mkv") == "tt1234567"
+    # no id, and no false positive on words containing "tt"
+    assert extract_imdb_id("KAMUI.Hes.Behind.You.s01e09.mkv") is None
+    assert extract_imdb_id("butter.mkv") is None
+    assert extract_imdb_id("") is None
+
+
+def test_release_title_from_file_and_folder():
+    assert release_title("KAMUI.Hes.Behind.You.s01e09.mkv") == "KAMUI Hes Behind You"
+    assert release_title("KAMUI.Hes.Behind.You.1x09.mkv") == "KAMUI Hes Behind You"
+    # A folder name must not be truncated at its last dot (no Path.stem).
+    assert (
+        release_title("Ushiro.no.Shoumen.Kamui-san.{tvdb-473913}.[imdbid-tt42969298]")
+        == "Ushiro no Shoumen Kamui san"
+    )
+    assert (
+        release_title(
+            "Captain.America.The.Winter.Soldier.(2014).{tvdb-965}.[imdbid-tt1843866].4k.mkv"
+        )
+        == "Captain America The Winter Soldier"
+    )
 
 
 def test_subtitle_video_pairing():

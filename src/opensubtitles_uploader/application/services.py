@@ -42,7 +42,13 @@ from opensubtitles_uploader.domain.model import (
     UserInfo,
     VideoFile,
 )
-from opensubtitles_uploader.domain.naming import clean_movie_name, episode_tag, significant_words
+from opensubtitles_uploader.domain.naming import (
+    clean_movie_name,
+    episode_tag,
+    extract_imdb_id,
+    release_title,
+    significant_words,
+)
 
 _IMDB_ID_RE = re.compile(r"^(?:tt?)?\d{1,9}$", re.IGNORECASE)
 
@@ -218,30 +224,68 @@ class VideoService:
             movie=movie,
         )
 
-    def identify(self, video: VideoFile) -> VideoFile:
-        """Best-effort movie identification, mirroring the old flow.
+    def identify(
+        self,
+        video: VideoFile,
+        *,
+        title: str | None = None,
+        imdb_id: str | None = None,
+    ) -> VideoFile:
+        """Best-effort movie identification.
 
-        1. the hash match already found by :meth:`analyze`; otherwise
-        2. a ``GuessMovieFromString``-style guess on the file name;
-        3. fall back to a full-text search using the cleaned file name.
+        Resolution order:
+
+        1. the hash match already found by :meth:`analyze`;
+        2. an explicit ``imdb_id`` (CLI/GUI override) — otherwise an IMDb id
+           embedded in the file name, otherwise one in the folder that
+           contains the file;
+        3. a ``GuessMovieFromString``-style guess on the file name, then a
+           full-text search using the explicit ``title`` or the cleaned
+           file/folder name.
         """
+        explicit_imdb = normalize_imdb_id(imdb_id) if imdb_id else None
+        path_imdb = extract_imdb_id(video.name) or extract_imdb_id(video.path.parent.name)
+        clean_title = (title or "").strip() or release_title(video.name)
+        if not clean_title:
+            clean_title = release_title(video.path.parent.name)
+
         movie = video.movie
-        if movie is None:
-            try:
-                movie = self._catalog.guess_movie(video.name)
-            except Exception:
-                movie = None
-        if movie is None:
-            title = clean_movie_name(video.name)
-            if title:
+        if explicit_imdb:
+            # An explicit id always wins, even over a hash match.
+            movie = self._movie_for_imdb(explicit_imdb, clean_title or video.name)
+        elif movie is None and path_imdb:
+            movie = self._movie_for_imdb(path_imdb, clean_title or video.name)
+
+        if movie is None and clean_title:
+            if not title:
                 try:
-                    results = self._catalog.search_features(title)
+                    movie = self._catalog.guess_movie(video.name)
+                except Exception:
+                    movie = None
+            if movie is None:
+                try:
+                    results = self._catalog.search_features(clean_title)
                     movie = _pick_movie(results, video.name)
                 except Exception:
                     movie = None
+
         if movie is None:
             return video
         return self._apply_movie(video, movie)
+
+    def _movie_for_imdb(self, imdb_id: str, fallback_title: str) -> MovieRef:
+        """Resolve an IMDb id to full metadata, degrading to just the id.
+
+        When the service is unreachable the id alone is still enough to
+        upload, so a minimal :class:`MovieRef` is returned instead.
+        """
+        try:
+            details = self._catalog.feature_details(imdb_id)
+        except Exception:
+            details = None
+        if details is not None:
+            return details
+        return MovieRef(imdb_id=imdb_id, title=fallback_title or imdb_id)
 
     def attach_backdrop(self, video: VideoFile) -> VideoFile:
         if self._backdrop is None or video.movie is None:
