@@ -46,7 +46,7 @@ _ES: dict[str, str] = {
     "None": "Ninguno",
     "Translator": "Traductor",
     "Comment": "Comentario",
-    "Hearing impaired": "Para sordos (sonidos)",
+    "Hearing impaired (SDH)": "Subtítulos para sordos (SDH)",
     "Auto-translated": "Traducción automática",
     "Foreign parts only": "Solo partes extranjeras",
     "Detected title": "Título detectado",

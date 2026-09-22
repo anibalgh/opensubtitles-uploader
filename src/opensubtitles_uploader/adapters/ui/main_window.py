@@ -380,7 +380,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._drop_hint_subtitle)
 
         flags = QHBoxLayout()
-        self.sub_hearing = QCheckBox(self.tr.tr("Hearing impaired"))
+        self.sub_hearing = QCheckBox(self.tr.tr("Hearing impaired (SDH)"))
         self.sub_machine = QCheckBox(self.tr.tr("Auto-translated"))
         self.sub_foreign = QCheckBox(self.tr.tr("Foreign parts only"))
         flags.addWidget(self.sub_hearing)

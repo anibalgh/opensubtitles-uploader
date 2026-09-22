@@ -24,7 +24,7 @@ testeable y reutilizable desde la GUI **o** desde la línea de comandos.
 | 🎬 **Carga de video** | Arrastrar y soltar o examinar; calcula el *moviehash* de OpenSubtitles leyendo solo los primeros/últimos 64 KiB (instantáneo incluso con videos de varios GB). |
 | 🧠 **Identificación automática** | Por *moviehash* vía REST; si no hay coincidencia, por el **IMDB id** del nombre del archivo o de su carpeta contenedora, y por búsqueda del título (archivo o carpeta); **prefiere el episodio cuyo `SxxEyy` coincide** con el nombre del archivo. Título e IMDB id se pueden forzar con `--title`/`--imdb-id`. Rellena IMDB id y carátula. |
 | 📊 **Metadatos técnicos** | vía `mediainfo` o `ffprobe` (opcional): fps, duración (ms), fotogramas, resolución y alta definición. Si no hay binarios, la app funciona sin esa ficha. |
-| 💬 **Carga de subtítulos** | MD5, auto-detección de idioma (contenido + nombre de archivo, offline y sin dependencias), detección de *hearing impaired*, *machine translated* y *foreign parts only*. |
+| 💬 **Carga de subtítulos** | MD5, auto-detección de idioma (contenido + nombre de archivo, offline y sin dependencias), detección de *Subtítulos para sordos (SDH)*, *machine translated* y *foreign parts only*. |
 | 🔎 **Búsqueda** | Busca películas/series/episodios y asigna el IMDB id sin salir de la app. |
 | ⬆️ **Subida robusta** | Antes de subir ejecuta `TryUploadSubtitles`: si el subtítulo **ya existe** lo informa con enlace; si el servidor responde `IDMovieImdb` (autoritativo por hash, clave en series) lo usa en la subida. El contenido se envía en **zlib (RFC 1950) + base64**, el formato exacto que espera el endpoint XML-RPC. |
 | 🎨 **Interfaz moderna** | Qt con tema claro/oscuro por tokens, drag & drop nativo, icono oficial por plataforma (`.ico`/`.icns`/`.png`), estados de carga/error y **diálogos modales** para errores de login/subida (motivo siempre visible). |
@@ -130,6 +130,8 @@ poetry run opensubtitles-uploader search "The Terror"
 poetry run opensubtitles-uploader upload video.mkv sub.eng.srt --language en
 # Forzar título e IMDB id en vez de deducirlos del archivo/carpeta:
 poetry run opensubtitles-uploader upload video.mkv sub.eng.srt --imdb-id tt42969298
+# Activar explícitamente el flag de "Subtítulos para sordos" (SDH):
+poetry run opensubtitles-uploader upload video.mkv sub.eng.srt --sdh
 ```
 
 Comandos: `login`, `logout`, `whoami`, `analyze`, `search`, `upload`.

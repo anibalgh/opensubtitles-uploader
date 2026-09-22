@@ -204,6 +204,9 @@ def upload(
     release_name: str | None = typer.Option(None, help="Release name"),
     translator: str | None = typer.Option(None, help="Translator"),
     comment: str | None = typer.Option(None, help="Comment for the subtitle"),
+    sdh: bool = typer.Option(
+        False, "--sdh", help="Activa el flag de Subtítulos para sordos (SDH / Hearing Impaired)."
+    ),
 ) -> None:
     """Analyse video + subtitle and upload the subtitle."""
     ctx = _context()
@@ -230,6 +233,7 @@ def upload(
         release_name=release_name or "",
         translator=translator or "",
         comment=comment or "",
+        hearing_impaired=True if sdh else None,
     )
     movie = analysed_video.movie
     if movie is None:
