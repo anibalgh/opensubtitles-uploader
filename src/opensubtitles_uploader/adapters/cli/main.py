@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import NoReturn
 
 import typer
 from rich.console import Console
@@ -45,7 +46,7 @@ console = Console()
 _context = bootstrap
 
 
-def _err(message: str) -> None:
+def _err(message: str) -> NoReturn:
     console.print(f"[red]✗ {message}[/red]")
     raise typer.Exit(code=1)
 
